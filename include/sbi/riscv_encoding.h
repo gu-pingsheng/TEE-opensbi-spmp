@@ -134,6 +134,24 @@
 #define HGATP64_VMID_MASK		_ULL(0x03FFF00000000000)
 #define HGATP64_PPN			_ULL(0x00000FFFFFFFFFFF)
 
+/* page table entry (PTE) fields */
+#define PTE_V     0x001 // Valid
+#define PTE_R     0x002 // Read
+#define PTE_W     0x004 // Write
+#define PTE_X     0x008 // Execute
+#define PTE_U     0x010 // User
+#define PTE_G     0x020 // Global
+#define PTE_A     0x040 // Accessed
+#define PTE_D     0x080 // Dirty
+#define PTE_SOFT  0x300 // Reserved for Software
+
+#define PTE_PPN_SHIFT 10
+
+#define PTE_TABLE(PTE) (((PTE) & (PTE_V | PTE_R | PTE_W | PTE_X)) == PTE_V)
+
+#define RISCV_PGSHIFT			12
+#define RISCV_PGSIZE			(1 << RISCV_PGSHIFT)
+
 #define PMP_R				_UL(0x01)
 #define PMP_W				_UL(0x02)
 #define PMP_X				_UL(0x04)
