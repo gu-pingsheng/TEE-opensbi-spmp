@@ -3,6 +3,16 @@
 
 #include <sm/print.h>
 
+static unsigned long form_pmp_size(unsigned long pmp_size) {
+  int i;
+  // make lower bits all ones
+  // 0x00ee --> 0x00ff
+  for (i = 1; i <= 32; i = i << 1)
+	  pmp_size |= (pmp_size >> i);
+  // return (0x00ff + 1) = 0x0100
+  return (pmp_size + 1);
+}
+
 int platform_init()
 {
   struct pmp_config_t pmp_config;
@@ -16,7 +26,7 @@ int platform_init()
 
   //config the PMP 0 to protect security monitor
   pmp_config.paddr = (uintptr_t)SM_BASE;
-  pmp_config.size = (unsigned long)SM_SIZE;
+  pmp_config.size = form_pmp_size((unsigned long)SM_SIZE);
   pmp_config.mode = PMP_A_NAPOT;
   pmp_config.perm = PMP_NO_PERM;
   set_pmp_and_sync(0, pmp_config);
