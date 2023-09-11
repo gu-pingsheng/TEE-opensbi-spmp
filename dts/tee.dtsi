@@ -1,0 +1,43 @@
+/dts-v1/;
+
+/ {
+    
+	L18: soc {
+		L2: clint@2000000 {
+			compatible = "riscv,clint0";
+			interrupts-extended = <&L4 3 &L4 7>;
+			reg = <0x0 0x38000000 0x0 0x10000>;
+			reg-names = "control";
+			clock-frequency-mhz = <500>;
+		};
+		L14: serial@60000000 {
+			compatible = "xilinx,uartlite", "xlnx,xps-uartlite-1.00.a";
+			interrupt-parent = <&PLIC>;
+			interrupts = <3>;
+			current-speed = <115200>;
+			reg = <0x0 0x40600000 0x0 0x1000>;
+			reg-names = "control";
+		};
+    sdhci: mmc {
+      compatible = "nemu-sdhost";
+			reg = <0x0 0x40002000 0x0 0x1000>;
+    };
+	};
+  chosen {
+    bootargs = " earlyprintk earlycon ";
+  };
+	L11: memory@100000000 {
+		device_type = "memory";
+		reg = <0x0 0x80000000 0x2 0x00000000>;
+	};
+    reserved-memory {
+        /* global autoconfigured region for contiguous allocations */
+        linux,cma {
+                compatible = "shared-dma-pool";
+                reusable;
+                size = <0 0x28000000>;
+                alloc-ranges = <0 0xa0000000 0 0x40000000>;
+                linux,cma-default;
+        };
+    };
+};
