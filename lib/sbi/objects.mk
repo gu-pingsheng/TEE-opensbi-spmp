@@ -69,3 +69,5 @@ libsbi-objs-y += sm/gm/miracl/mrsroot.o
 libsbi-objs-y += sm/gm/miracl/mrlucas.o
 libsbi-objs-y += sm/gm/SM2_sv.o
 libsbi-objs-y += sm/gm/SM3.o
+
+libsbi-objs-y += sm/platform/spmp/spmp.o

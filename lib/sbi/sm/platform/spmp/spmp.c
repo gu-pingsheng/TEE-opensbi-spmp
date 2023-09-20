@@ -1,10 +1,10 @@
 #include <sm/platform/spmp/spmp.h>
-#include <sm/ipi.h>
+//#include <sm/ipi.h>
 #include <stddef.h>
 
 void set_spmp(int spmp_idx, struct spmp_config_t spmp_cfg_t)
 {
-#if 0
+#if 1
   uintptr_t spmp_address = 0;
   uintptr_t old_config = 0;
   uintptr_t spmp_config = ((spmp_cfg_t.mode & SPMP_A) | (spmp_cfg_t.perm & (SPMP_R|SPMP_W|SPMP_X)))
@@ -87,7 +87,7 @@ void set_spmp(int spmp_idx, struct spmp_config_t spmp_cfg_t)
 
 void clear_spmp(int spmp_idx)
 {
-#if 0
+#if 1
   struct spmp_config_t spmp_cfg;
 
   spmp_cfg.mode = SPMP_OFF;
@@ -102,7 +102,7 @@ void clear_spmp(int spmp_idx)
 struct spmp_config_t get_spmp(int spmp_idx)
 {
   struct spmp_config_t spmp={0,};
-#if 0
+#if 1
   uintptr_t spmp_address = 0;
   uintptr_t spmp_config = 0;
   unsigned long order = 0;

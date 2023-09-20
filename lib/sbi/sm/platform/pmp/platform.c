@@ -39,6 +39,15 @@ int platform_init()
   //set_pmp(NPMP-1, pmp_config);
   set_pmp_and_sync(NPMP-1, pmp_config);
 
+//config the last sPMP to allow user to access memory (SRWX=1000)
+  struct spmp_config_t spmp_config;
+  spmp_config.paddr = 0;
+  spmp_config.size = -1UL;
+  spmp_config.mode = SPMP_NAPOT;
+  spmp_config.perm = SPMP_NO_PERM;
+  spmp_config.sbit = SPMP_S;
+  set_spmp(NSPMP-1, spmp_config);
+
   printm("[Penglai Monitor@%s] setting initial PMP ready\n", __func__);
   return 0;
 }
