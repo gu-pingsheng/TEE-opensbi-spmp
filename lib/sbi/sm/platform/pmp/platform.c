@@ -2,6 +2,7 @@
 #include "platform_thread.c"
 
 #include <sm/print.h>
+#include <sm/platform/spmp/spmp.h>
 
 static unsigned long form_pmp_size(unsigned long pmp_size) {
   int i;
@@ -46,7 +47,7 @@ int platform_init()
   spmp_config.mode = SPMP_NAPOT;
   spmp_config.perm = SPMP_NO_PERM;
   spmp_config.sbit = SPMP_S;
-  set_spmp(NSPMP-1, spmp_config);
+  set_spmp_and_sync(NSPMP-1, spmp_config);
 
   printm("[Penglai Monitor@%s] setting initial PMP ready\n", __func__);
   return 0;

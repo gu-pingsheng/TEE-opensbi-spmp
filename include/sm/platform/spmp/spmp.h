@@ -4,6 +4,8 @@
 
 #include <stdint.h>
 #include <sbi/riscv_encoding.h>
+#include <sbi/riscv_asm.h>
+#include <sbi/sbi_hartmask.h>
 
 //number of PMP registers
 #define NSPMP 16
@@ -119,6 +121,24 @@ struct spmp_config_t
   uintptr_t sbit;
 
 };
+
+struct spmp_data_t
+{
+  struct spmp_config_t spmp_config_arg;
+  int spmp_idx_arg;
+  struct sbi_hartmask smask;
+};
+
+#define SBI_SPMP_DATA_INIT(__ptr, __spmp_config_arg, __spmp_idx_arg, __src) \
+do { \
+	(__ptr)->spmp_config_arg = (__spmp_config_arg); \
+	(__ptr)->spmp_idx_arg = (__spmp_idx_arg); \
+	SBI_HARTMASK_INIT_EXCEPT(&(__ptr)->smask, (__src)); \
+} while (0)
+
+
+void set_spmp_and_sync(int spmp_idx, struct spmp_config_t);
+void clear_spmp_and_sync(int spmp_idx);
 
 void set_spmp(int spmp_idx, struct spmp_config_t);
 

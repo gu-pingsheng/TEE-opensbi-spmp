@@ -1,5 +1,41 @@
-#include <sm/platform/spmp_xs/spmp.h>
+#include <sm/platform/spmp/spmp.h>
 #include <stddef.h>
+#include <sbi/sbi_spmp.h>
+#include <sm/sm.h>
+
+/**
+ * \brief Set spmp and sync all harts.
+ *
+ * \param spmp_idx_arg The spmp index.
+ * \param spmp_config_arg The spmp config.
+ */
+void set_spmp_and_sync(int spmp_idx_arg, struct spmp_config_t spmp_config_arg)
+{
+	struct spmp_data_t spmp_data;
+	u32 source_hart = current_hartid();
+
+	//set current hart's spmp
+	set_spmp(spmp_idx_arg, spmp_config_arg);
+	//sync all other harts
+	SBI_SPMP_DATA_INIT(&spmp_data, spmp_config_arg, spmp_idx_arg, source_hart);
+	sbi_send_spmp(0xFFFFFFFF&(~(1<<source_hart)), 0, &spmp_data);
+	return;
+}
+
+/**
+ * \brief Clear spmp and sync all harts.
+ *
+ * \param spmp_idx_arg The spmp index.
+ */
+void clear_spmp_and_sync(int spmp_idx)
+{
+	struct spmp_config_t spmp_config = {0,};
+
+	spmp_config.mode = SPMP_OFF;
+	set_spmp_and_sync(spmp_idx, spmp_config);
+
+	return;
+}
 
 void set_spmp(int spmp_idx, struct spmp_config_t spmp_cfg_t)
 {
