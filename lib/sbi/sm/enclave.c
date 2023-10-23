@@ -377,7 +377,7 @@ int swap_from_enclave_to_host(uintptr_t* regs, struct enclave_t* enclave)
 	return 0;
 }
 
-uintptr_t create_enclave(struct enclave_sbi_param_t create_args)
+uintptr_t create_enclave_m(struct enclave_sbi_param_t create_args)
 {
 	struct enclave_t* enclave;
 	unsigned int eid;

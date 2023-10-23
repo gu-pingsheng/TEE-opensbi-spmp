@@ -7,6 +7,10 @@
 #include <sm/math.h>
 #include <sbi/sbi_console.h>
 
+#include <sbi/sbi_string.h>
+#include <sm/platform/spmp/spmp.h>
+
+
 //static int sm_initialized = 0;
 //static spinlock_t sm_init_lock = SPINLOCK_INIT;
 
@@ -105,6 +109,8 @@ uintptr_t sm_create_enclave(uintptr_t enclave_sbi_param)
 {
   struct enclave_sbi_param_t enclave_sbi_param_local;
   uintptr_t retval = 0;
+  struct enclave_t* enclave;
+  unsigned int eid;
 
   printm("[Penglai Monitor] %s invoked\r\n",__func__);
 
@@ -125,8 +131,33 @@ uintptr_t sm_create_enclave(uintptr_t enclave_sbi_param)
     return -1UL;
   }
 
-  retval = create_enclave(enclave_sbi_param_local);
+  retval = create_enclave_m(enclave_sbi_param_local);
+  eid = *(enclave_sbi_param_local.eid_ptr);
+  enclave = get_enclave(eid);
 
+  sbi_memset(enclave->enclave_spmp_context, 0, sizeof(struct spmp_config_t) * NSPMP);
+  
+  //config the enclave sPMP structure to allow enclave to access memory
+  enclave->enclave_spmp_context[0].paddr = enclave->paddr;
+  enclave->enclave_spmp_context[0].size = enclave->size;
+  enclave->enclave_spmp_context[0].mode = SPMP_NAPOT;
+  enclave->enclave_spmp_context[0].perm = SPMP_R | SPMP_W | SPMP_X;
+
+  sbi_memset(enclave->thread_context.host_spmp_context, 0, sizeof(struct spmp_config_t) * (NSPMP-1));
+
+  for(int i = 0; i < (NSPMP-1); i++)
+  {
+  	clear_spmp(i);  
+  }
+
+  //config the last sPMP to allow user to access memory
+  enclave->thread_context.host_spmp_context[NSPMP-1].paddr = 0;
+  enclave->thread_context.host_spmp_context[NSPMP-1].size = -1UL;
+  enclave->thread_context.host_spmp_context[NSPMP-1].mode = SPMP_NAPOT;
+  enclave->thread_context.host_spmp_context[NSPMP-1].perm = SPMP_NO_PERM;
+  enclave->thread_context.host_spmp_context[NSPMP-1].sbit = SPMP_S;
+  set_spmp(NSPMP-1, enclave->thread_context.host_spmp_context[NSPMP-1]); 
+  
   printm("[Penglai Monitor] %s created return value:%ld \r\n",__func__, retval);
   return retval;
 }

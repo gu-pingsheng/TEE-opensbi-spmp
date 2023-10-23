@@ -79,7 +79,8 @@ struct enclave_t
   unsigned char hash[HASH_SIZE];
   // hash of enclave developer's public key
   unsigned char signer[HASH_SIZE];
-
+  struct spmp_config_t enclave_spmp_context[NSPMP];
+  
   //enclave thread context
   //TODO: support multiple threads
   struct thread_state_t thread_context;
@@ -91,7 +92,7 @@ struct cpu_state_t
   int eid;
 };
 
-uintptr_t create_enclave(struct enclave_sbi_param_t create_args);
+uintptr_t create_enclave_m(struct enclave_sbi_param_t create_args);
 uintptr_t run_enclave(uintptr_t* regs, unsigned int eid);
 uintptr_t stop_enclave(uintptr_t* regs, unsigned int eid);
 uintptr_t destroy_enclave(uintptr_t* regs, unsigned int eid);
@@ -108,5 +109,6 @@ uintptr_t enclave_derive_seal_key(uintptr_t* regs, uintptr_t salt_va,
                         uintptr_t salt_len, uintptr_t key_buf_va, uintptr_t key_buf_len);
 
 int check_in_enclave_world();
+struct enclave_t* get_enclave(int eid);
 
 #endif /* _ENCLAVE_H */

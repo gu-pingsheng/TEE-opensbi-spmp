@@ -2,6 +2,7 @@
 #define __THREAD_H__
 
 #include <stdint.h>
+#include <sm/platform/spmp/spmp.h>
 
 //default layout of enclave
 //#####################
@@ -73,6 +74,7 @@ struct thread_state_t
   uintptr_t prev_mepc;
   uintptr_t prev_cache_binding;
   struct general_registers_t prev_state;
+  struct spmp_config_t host_spmp_context[NSPMP];
 };
 
 /* swap previous and current thread states */

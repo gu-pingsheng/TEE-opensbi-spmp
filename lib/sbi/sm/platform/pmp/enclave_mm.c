@@ -510,7 +510,7 @@ int grant_enclave_access(struct enclave_t* enclave)
 	}
 
 	pmp_idx = REGION_TO_PMP(region_idx);
-#if 0
+#if 1
 	pmp_config.paddr = enclave->paddr;
 	pmp_config.size = enclave->size;
 #else
