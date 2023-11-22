@@ -281,7 +281,7 @@ struct pmp_config_t get_pmp(int pmp_idx)
 				pmp_address >>= 1;
 			}
 			order += 3;
-			size = 1 << order;
+			size = 1UL << order;
 			pmp_address <<= (order-1);
 			break;
 		case PMP_A_NA4:
@@ -313,7 +313,7 @@ void dump_pmps(void)
 	for (i=0; i<16; i++){
 		struct pmp_config_t pmp = get_pmp(i);
 		(void)pmp; //to ignore the unused variable warnings
-		printm("[Debug:SM@%s] pmp_%d: mode(0x%lx) perm(0x%lx) paddr(0x%lx) size(0x%lx)\n",
+		printm_err("[Debug:SM@%s] pmp_%d: mode(0x%lx) perm(0x%lx) paddr(0x%lx) size(0x%lx)\n",
 				__func__, i, pmp.mode, pmp.perm, pmp.paddr, pmp.size);
 	}
 }

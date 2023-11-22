@@ -10,17 +10,17 @@
 //number of PMP registers
 #define NSPMP 16
 
-//R/W/X/A/L field in PMP configuration registers
-#define SPMP_R     0x01
-#define SPMP_W     0x02
-#define SPMP_X     0x04
-#define SPMP_A     0x18
-#define SPMP_S     0x80
+//R/W/X/A/S field in PMP configuration registers
+#define SPMP_R     PMP_R
+#define SPMP_W     PMP_W
+#define SPMP_X     PMP_X
+#define SPMP_A     PMP_A
+#define SPMP_S     PMP_L
 
 //encoding of A field in PMP configuration registers
-#define SPMP_TOR   0x08
-#define SPMP_NA4   0x10
-#define SPMP_NAPOT 0x18
+#define SPMP_TOR   PMP_A_TOR
+#define SPMP_NA4   PMP_A_NA4
+#define SPMP_NAPOT PMP_A_NAPOT
 #define SPMP_OFF   0x00
 #define SPMP_NO_PERM  0
 
@@ -119,7 +119,6 @@ struct spmp_config_t
   uintptr_t perm;
   uintptr_t mode;
   uintptr_t sbit;
-
 };
 
 struct spmp_data_t
@@ -137,13 +136,14 @@ do { \
 } while (0)
 
 
-void set_spmp_and_sync(int spmp_idx, struct spmp_config_t);
+void set_spmp_and_sync(int spmp_idx, struct spmp_config_t spmp_config_arg);
 void clear_spmp_and_sync(int spmp_idx);
 
-void set_spmp(int spmp_idx, struct spmp_config_t);
+void set_spmp(int spmp_idx, struct spmp_config_t spmp_cfg_t);
 
 void clear_spmp(int spmp_idx);
 
 struct spmp_config_t get_spmp(int spmp_idx);
 
+void dump_spmps(void);
 #endif /* _SPMP_H */

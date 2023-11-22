@@ -178,9 +178,16 @@ uintptr_t sm_run_enclave(uintptr_t* regs, unsigned long eid)
 {
   uintptr_t retval;
   printm("[Penglai Monitor] %s invoked, eid:%ld\r\n",__func__, eid);
-
+#if 0
+  dump_pmps();
+  printm_err("\n");
+#endif
   retval = run_enclave(regs, (unsigned int)eid);
-
+#if 0
+  dump_pmps();
+  printm_err("\n");
+  dump_spmps();
+#endif
   printm("[Penglai Monitor] %s return: %ld\r\n",__func__, retval);
 
   return retval;

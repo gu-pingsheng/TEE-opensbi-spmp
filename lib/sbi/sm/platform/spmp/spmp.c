@@ -1,8 +1,9 @@
 #include <sm/platform/spmp/spmp.h>
 #include <stddef.h>
-#include <sbi/sbi_spmp.h>
+//#include <sbi/sbi_spmp.h>
 #include <sm/sm.h>
 
+#if 0
 /**
  * \brief Set spmp and sync all harts.
  *
@@ -36,6 +37,8 @@ void clear_spmp_and_sync(int spmp_idx)
 
 	return;
 }
+
+#endif 
 
 void set_spmp(int spmp_idx, struct spmp_config_t spmp_cfg_t)
 {
@@ -248,6 +251,7 @@ struct spmp_config_t get_spmp(int spmp_idx)
       break;
   }
 
+  //printm_err("##### get_spmp 1 spmp_idx: %d, spmp_address: 0x%lx, spmp_config: 0x%lx, size: 0x%lx #####\n", spmp_idx, spmp_address, spmp_config, size);
   spmp_config >>= (uintptr_t)SPMPCFG_BIT_NUM * (spmp_idx % SPMP_PER_CFG_REG);
   spmp_config &= SPMPCFG_BITS;
   switch(spmp_config & SPMP_A)
@@ -257,9 +261,10 @@ struct spmp_config_t get_spmp(int spmp_idx)
       {
         order += 1;
         spmp_address >>= 1;
+        //printm_err("##** order: 0x%lx, spmp_address: 0x%lx ##**\n", order, spmp_address);
       }
       order += 3;
-      size = 1 << order;
+      size = 1UL << order;
       spmp_address <<= (order-1);
       break;
     case SPMP_NA4:
@@ -276,6 +281,19 @@ struct spmp_config_t get_spmp(int spmp_idx)
   spmp.perm = spmp_config & (SPMP_R | SPMP_W | SPMP_X);
   spmp.paddr = spmp_address;
   spmp.size = size;
+  spmp.sbit = spmp_config & SPMP_S;
+  //printm_err("##### get_spmp spmp_idx: %d, spmp_address: 0x%lx, spmp_config: 0x%lx, size: 0x%lx sbit: 0x%lx mode: 0x%lx perm: 0x%lx#####\n", spmp_idx, spmp_address, spmp_config, size, spmp.sbit, spmp.mode, spmp.perm);
 #endif
   return spmp;
+}
+
+void dump_spmps(void)
+{
+	int i;
+	for (i = 0; i < NSPMP; i++){
+		struct spmp_config_t spmp = get_spmp(i);
+		(void)spmp; //to ignore the unused variable warnings
+		printm_err("[Debug:SM@%s] spmp_%d: mode(0x%lx) perm(0x%lx) paddr(0x%lx) size(0x%lx) sbit(0x%lx)\n",
+				__func__, i, spmp.mode, spmp.perm, spmp.paddr, spmp.size, spmp.sbit);
+	}
 }
