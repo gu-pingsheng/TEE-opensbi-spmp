@@ -143,6 +143,12 @@ uintptr_t sm_create_enclave(uintptr_t enclave_sbi_param)
   enclave->enclave_spmp_context[0].mode = SPMP_NAPOT;
   enclave->enclave_spmp_context[0].perm = SPMP_R | SPMP_W | SPMP_X;
 
+//set the spmp_1 to let enclave access kbuffer shared memory
+  enclave->enclave_spmp_context[1].paddr = enclave_sbi_param_local.kbuffer_paddr;
+  enclave->enclave_spmp_context[1].size = enclave_sbi_param_local.kbuffer_size;
+  enclave->enclave_spmp_context[1].mode = SPMP_NAPOT;
+  enclave->enclave_spmp_context[1].perm = SPMP_R | SPMP_W | SPMP_X;
+  printm("[Penglai Monitor] %s, kbuffer_paddr: 0x%lx\n", __func__, enclave_sbi_param_local.kbuffer_paddr);
   sbi_memset(enclave->thread_context.host_spmp_context, 0, sizeof(struct spmp_config_t) * (NSPMP-1));
 
   for(int i = 0; i < (NSPMP-1); i++)

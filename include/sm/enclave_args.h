@@ -75,6 +75,7 @@ struct enclave_sbi_param_t
   unsigned long free_mem;
   //enclave shared mem with kernel
   unsigned long kbuffer;
+  unsigned long kbuffer_paddr;
   unsigned long kbuffer_size;
   unsigned long *ecall_arg0;
   unsigned long *ecall_arg1;
