@@ -10,6 +10,7 @@
 #include <sm/platform/pmp/platform.h>
 #include <stdint.h>
 #include <sm/enclave_args.h>
+#include <sm/page_map.h>
 
 extern uintptr_t _fw_start[], _fw_end[];
 
@@ -36,6 +37,10 @@ extern uintptr_t _fw_start[], _fw_end[];
 #define SBI_ENCLAVE_OCALL        98
 #define SBI_GET_KEY             88
 
+#define SBI_CREATE_SHM          79
+#define SBI_MAP_SHM             78
+#define SBI_GET_SHM             77
+
 //Error code of SBI_ALLOC_ENCLAVE_MEM
 #define ENCLAVE_NO_MEMORY       -2
 #define ENCLAVE_ERROR           -1
@@ -51,6 +56,23 @@ extern uintptr_t _fw_start[], _fw_end[];
 #define RESUME_FROM_TIMER_IRQ    2000
 #define RESUME_FROM_STOP         2003
 #define RESUME_FROM_OCALL        2
+
+// SM需要管理所有的共享内存段，
+#define NUM_SHM 128   // 定义共享内存的数量
+#define NUM_EACH_SHM 128 //定义每个共享区可被多少的enclave共享
+// #define DEFAULT_SHM_PTR  0x1000080000
+struct enclave_shm_t
+{
+  bool used;
+  unsigned long key;
+  // unsigned int nums_cur_enclave;
+  unsigned int eids[NUM_EACH_SHM];
+  bool eids_used[NUM_EACH_SHM]; 
+  unsigned long paddr;
+  unsigned long size;
+  u8 perm; // 被共享者默认具有的静态最大权限
+};
+
 
 void sm_init();
 
@@ -85,4 +107,6 @@ uintptr_t sm_do_timer_irq(uintptr_t *regs, uintptr_t mcause, uintptr_t mepc);
 
 int check_in_enclave_world();
 
+virtual_addr_t sm_create_shm(unsigned long key, unsigned long req_size, unsigned long perm);
+virtual_addr_t sm_map_shm(unsigned long key);
 #endif /* _SM_H */

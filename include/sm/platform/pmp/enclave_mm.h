@@ -77,4 +77,6 @@ int mm_free(void* paddr, unsigned long size);
 
 void print_buddy_system();
 
+uintptr_t get_enclave_paddr_from_va(pte_t *enclave_root_pt, uintptr_t vaddr);
+
 #endif /* _ENCLAVE_MM_H */

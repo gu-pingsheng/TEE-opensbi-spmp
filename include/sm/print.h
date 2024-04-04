@@ -2,6 +2,7 @@
 #define SM_PRINT_H
 
 #include <sbi/sbi_console.h>
+#define PENGLAI_DEBUG
 
 #ifdef PENGLAI_DEBUG
 #define printm(...) sbi_printf(__VA_ARGS__)

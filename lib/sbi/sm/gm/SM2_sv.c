@@ -376,8 +376,9 @@ static int SM2_make_pubkey(unsigned char PriKey[], unsigned char Px[], unsigned 
 int SM2_KeyGeneration(unsigned char PriKey[], unsigned char Px[], unsigned char Py[])
 {
 	int i = 0;
-	
+	// 本例中SM的私钥是固定的
 	SM2_make_prikey(PriKey);
+	// 公钥由SM的私钥参数，产生公钥的算法是SM2算法
 	i = SM2_make_pubkey(PriKey, Px, Py);
 	if (i)
 		return i;

@@ -47,6 +47,7 @@ static int sbi_ecall_penglai_host_handler(unsigned long extid, unsigned long fun
 			ret = sm_stop_enclave((uintptr_t *)regs, regs->a0);
 			break;
 		case SBI_RESUME_ENCLAVE:
+			// printm("[sbi_ecall_penglai_host_handler] SBI_RESUME_ENCLAVE invoked!\n");
 			ret = sm_resume_enclave((uintptr_t *)regs, regs->a0);
 			break;
 		case SBI_DESTROY_ENCLAVE:
@@ -79,6 +80,12 @@ static int sbi_ecall_penglai_enclave_handler(unsigned long extid, unsigned long 
 
 	switch (funcid) {
 		// The following is the Penglai's Handler
+		case SBI_CREATE_SHM:
+			ret = sm_create_shm(regs->a0, regs->a1, regs->a2);
+			break;
+		case SBI_MAP_SHM:
+			ret = sm_map_shm(regs->a0);
+			break;
 		case SBI_EXIT_ENCLAVE:
 			ret = sm_exit_enclave((uintptr_t *)regs, regs->a0);
 			break;

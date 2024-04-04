@@ -45,6 +45,8 @@ void set_spmp(int spmp_idx, struct spmp_config_t spmp_cfg_t)
 #if 1
   uintptr_t spmp_address = 0;
   uintptr_t old_config = 0;
+
+  // 从spmp_cfg_t中获取配置信息，并转换成sPMP寄存器格式，这里使用的是64位 spmp_cfg格式
   uintptr_t spmp_config = ((spmp_cfg_t.sbit & SPMP_S) | (spmp_cfg_t.mode & SPMP_A) | (spmp_cfg_t.perm & (SPMP_R|SPMP_W|SPMP_X)))
     << ((uintptr_t)SPMPCFG_BIT_NUM * (spmp_idx % SPMP_PER_CFG_REG));
 
@@ -54,6 +56,7 @@ void set_spmp(int spmp_idx, struct spmp_config_t spmp_cfg_t)
       if(spmp_cfg_t.paddr == 0 && spmp_cfg_t.size == -1UL)
         spmp_address = -1UL;
       else
+      // (spmp_cfg_t.paddr | ((spmp_cfg_t.size>>1)-1)) >> 2 这个操作是sPMP地址空间大小的匹配算法，地址信息中包含需要保护的内存区间的大小信息
         spmp_address = (spmp_cfg_t.paddr | ((spmp_cfg_t.size>>1)-1)) >> 2;
       break;
     case SPMP_TOR:
@@ -72,6 +75,7 @@ void set_spmp(int spmp_idx, struct spmp_config_t spmp_cfg_t)
 //  LIST_OF_SPMP_REGS
 #undef X
     case 0:
+    // 在RV64中，一个配置寄存器包含8组sPMP配置信息，需要读取原始sPMP寄存器的信息，清除该组中的原始配置，再修改某组中的配置信息
       old_config = read_spmpcfg(spmpcfg0);
       spmp_config |= (old_config &
           ~((uintptr_t)SPMPCFG_BITS << (uintptr_t)SPMPCFG_BIT_NUM*(0%SPMP_PER_CFG_REG)));
@@ -252,11 +256,13 @@ struct spmp_config_t get_spmp(int spmp_idx)
   }
 
   //printm_err("##### get_spmp 1 spmp_idx: %d, spmp_address: 0x%lx, spmp_config: 0x%lx, size: 0x%lx #####\n", spmp_idx, spmp_address, spmp_config, size);
+  // 通过移位操作获取该组sPMP寄存器的配置信息
   spmp_config >>= (uintptr_t)SPMPCFG_BIT_NUM * (spmp_idx % SPMP_PER_CFG_REG);
   spmp_config &= SPMPCFG_BITS;
   switch(spmp_config & SPMP_A)
   {
     case SPMP_NAPOT:
+      // 当地址采用NAPOT编码时，解析sPMP隔离的地址和大小
       while(spmp_address & 1)
       {
         order += 1;
@@ -270,6 +276,7 @@ struct spmp_config_t get_spmp(int spmp_idx)
     case SPMP_NA4:
       size = 4;
     case SPMP_TOR:
+      // 当采用SPMP_TOR模式时，这里没有计算size大小，应该存在问题？？？？
       break;
     case SPMP_OFF:
       spmp_address = 0;

@@ -221,6 +221,7 @@ int check_mem_overlap(uintptr_t paddr, unsigned long size)
   return 0;
 }
 
+// 由内核分配的物理内存，寻找一组空闲的PMP将其隔离
 uintptr_t mm_init(uintptr_t paddr, unsigned long size)
 {
   uintptr_t retval = 0;
@@ -243,6 +244,7 @@ uintptr_t mm_init(uintptr_t paddr, unsigned long size)
     goto out;
   }
 
+  // 从第3个PMP开始，寻找一个没有使用的PMP寄存器
   //alloc a free pmp
   for(region_idx = 0; region_idx < N_PMP_REGIONS; ++region_idx)
   {
@@ -259,6 +261,7 @@ uintptr_t mm_init(uintptr_t paddr, unsigned long size)
     goto out;
   }
 
+  //
   //set PMP to protect enclave memory region
   pmp_config.paddr = paddr;
   pmp_config.size = size;

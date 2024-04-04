@@ -53,6 +53,7 @@ libsbi-objs-y += sm/thread.o
 libsbi-objs-y += sm/utils.o
 libsbi-objs-y += sm/platform/pmp/platform.o
 libsbi-objs-y += sm/attest.o
+libsbi-objs-y += sm/page_map.o
 
 libsbi-objs-y += sm/gm/miracl/mrcore.o
 libsbi-objs-y += sm/gm/miracl/mrarth0.o

@@ -20,6 +20,7 @@ static spinlock_t enclave_metadata_lock = SPIN_LOCK_INITIALIZER;
 struct link_mem_t* enclave_metadata_head = NULL;
 struct link_mem_t* enclave_metadata_tail = NULL;
 
+// 当执行enclave时，需要配置当前CPU处于enclave模式，以及当前正在执行的enclaveID
 static void enter_enclave_world(int eid)
 {
 	cpus[csr_read(CSR_MHARTID)].in_enclave = ENCLAVE_MODE;
@@ -28,7 +29,11 @@ static void enter_enclave_world(int eid)
 	platform_enter_enclave_world();
 }
 
-static int get_enclave_id()
+// static int get_enclave_id()
+// {
+// 	return cpus[csr_read(CSR_MHARTID)].eid;
+// }
+int get_enclave_id()
 {
 	return cpus[csr_read(CSR_MHARTID)].eid;
 }
@@ -74,6 +79,9 @@ struct link_mem_t* init_mem_link(unsigned long mem_size, unsigned long slab_size
 {
 	struct link_mem_t* head;
 
+	// link_mem数据结构用来存储enclave元数据，link_mem大概率存储在第一个mm_region中
+	// 申请到的内存布局：
+	// |link_mem_t| 填充数据使放slab的数据首地址对齐slab元素 |slab元素
 	head = (struct link_mem_t*)mm_alloc(mem_size, NULL);
 
 	if (head == NULL)
@@ -85,6 +93,7 @@ struct link_mem_t* init_mem_link(unsigned long mem_size, unsigned long slab_size
 	head->slab_size = slab_size;
 	head->slab_num = (mem_size - sizeof(struct link_mem_t)) / slab_size;
 	void* align_addr = (char*)head + sizeof(struct link_mem_t);
+	// 使指向salb首元素的地址对齐，从该地址开始可以放n个slab元素
 	head->addr = (char*)size_up_align((unsigned long)align_addr, slab_size);
 	head->next_link_mem = NULL;
 
@@ -107,6 +116,7 @@ struct link_mem_t* add_link_mem(struct link_mem_t** tail)
 	new_link_mem->slab_num = (*tail)->slab_num;
 	new_link_mem->slab_size = (*tail)->slab_size;
 	void* align_addr = (char*)new_link_mem + sizeof(struct link_mem_t);
+	// 使指向salb首元素的地址对齐，从该地址开始可以放n个slab元素
 	new_link_mem->addr = (char*)size_up_align((unsigned long)align_addr, (*tail)->slab_size);
 	new_link_mem->next_link_mem = NULL;
 
@@ -119,6 +129,7 @@ int remove_link_mem(struct link_mem_t** head, struct link_mem_t* ptr)
 	int retval =0;
 
 	cur_link_mem = *head;
+	// 如果当前指向的是将要删除的link_mem
 	if (cur_link_mem == ptr)
 	{
 		*head = cur_link_mem->next_link_mem;
@@ -145,8 +156,10 @@ int remove_link_mem(struct link_mem_t** head, struct link_mem_t* ptr)
  * alloc an enclave struct now, which is zeroed
  * Note: do not acquire metadata lock before the function!
  * */
+// enclave数据结构由SM通过SLAB单元进行管理
 static struct enclave_t* alloc_enclave()
 {
+	// link_mem_t使用单向链表
 	struct link_mem_t *cur, *next;
 	struct enclave_t* enclave = NULL;
 	int i, found, eid;
@@ -157,11 +170,13 @@ static struct enclave_t* alloc_enclave()
 	if(enclave_metadata_head == NULL)
 	{
 		enclave_metadata_head = init_mem_link(ENCLAVE_METADATA_REGION_SIZE, sizeof(struct enclave_t));
+		printm("[Penglai Monitor@%s] enclave_t size:%ld\r\n", __func__, sizeof(struct enclave_t));
 		if(!enclave_metadata_head)
 		{
 			printm("[Penglai Monitor@%s] don't have enough mem\r\n", __func__);
 			goto alloc_eid_out;
 		}
+		// enclave_metadata_tail指向最后一个有效enclave 元数据节点
 		enclave_metadata_tail = enclave_metadata_head;
 	}
 
@@ -189,6 +204,7 @@ static struct enclave_t* alloc_enclave()
 	//don't have enough enclave metadata
 	if(!found)
 	{
+		// 新增加的节点内存和enclave_metadata_tail指向的节点内存大小一样
 		next = add_link_mem(&enclave_metadata_tail);
 		if(next == NULL)
 		{
@@ -196,6 +212,7 @@ static struct enclave_t* alloc_enclave()
 			enclave = NULL;
 			goto alloc_eid_out;
 		}
+		// link_mem_t中的addr指向第一个enclave元数据的首地址
 		enclave = (struct enclave_t*)(next->addr);
 		sbi_memset((void*)enclave, 0, sizeof(struct enclave_t));
 		enclave->state = FRESH;
@@ -217,8 +234,10 @@ static int free_enclave(int eid)
 
 	found = 0;
 	count = 0;
+	// 遍历enclave_metadata元数据链表
 	for(cur = enclave_metadata_head; cur != NULL; cur = cur->next_link_mem)
 	{
+		// 判断该enclave是否在当前元数据内存块的边界内
 		if(eid < (count + cur->slab_num))
 		{
 			enclave = (struct enclave_t*)(cur->addr) + (eid - count);
@@ -243,6 +262,7 @@ static int free_enclave(int eid)
 	return ret_val;
 }
 
+// enclave中的元数据在mm_region管理的内存区域中
 struct enclave_t* get_enclave(int eid)
 {
 	struct link_mem_t *cur;
@@ -276,7 +296,9 @@ struct enclave_t* get_enclave(int eid)
 	return enclave;
 }
 
-//switch the spmp context from host to enclave befire entering enclave world
+// 在退出enclave之前，需要将当前sPMP寄存器中的值保存在enclave的上下文中
+// 在执行enclave之前，需要从enclave上下文中恢复sPMP中保存的值
+//switch the spmp context from host to enclave before entering enclave world
 void switch_spmp_context_h2e(struct enclave_t* enclave)
 {
 	int i;
@@ -302,9 +324,11 @@ void switch_spmp_context_h2e(struct enclave_t* enclave)
 }
 
 
-
+// 切换相关寄存器中的状态，从host切换到enclave中执行
+// host_regs指向的寄存器上下文哪个时机保存到内存中的？？还是说host_regs指向cpu中的寄存器，这应该不可能呀
 int swap_from_host_to_enclave(uintptr_t* host_regs, struct enclave_t* enclave)
 {
+	// printm("[enclave.c] %s invoked!\n", __func__);
 	//grant encalve access to memory
 	if(grant_enclave_access(enclave) < 0)
 		return -1;
@@ -329,16 +353,19 @@ int swap_from_host_to_enclave(uintptr_t* host_regs, struct enclave_t* enclave)
 	// disable interrupts
 	swap_prev_mie(&(enclave->thread_context), csr_read(CSR_MIE));
 
+	// 直接清除挂起的中断，不会导致未响应的中断缺失吗？？？
 	// clear pending interrupts
 	csr_read_clear(CSR_MIP, MIP_MTIP);
 	csr_read_clear(CSR_MIP, MIP_STIP);
 	csr_read_clear(CSR_MIP, MIP_SSIP);
 	csr_read_clear(CSR_MIP, MIP_SEIP);
 
+	// 保存当前中断和异常委派（mideleg/medeleg）寄存器的值，在进入enclave之前清空medeleg和mideleg寄存器，使Eapp中发生的中断和异常由SM捕获处理
 	//disable interrupts/exceptions delegation
 	swap_prev_mideleg(&(enclave->thread_context), csr_read(CSR_MIDELEG));
 	swap_prev_medeleg(&(enclave->thread_context), csr_read(CSR_MEDELEG));
 
+	//切换mepc，将执行流从host转入enclave APP中，在首次运行enclave时，enclave的执行入口写入mepc中
 	// swap the mepc to transfer control to the enclave
 	// This will be overwriten by the entry-address in the case of run_enclave
 	//swap_prev_mepc(&(enclave->thread_context), csr_read(CSR_MEPC));
@@ -362,6 +389,7 @@ int swap_from_host_to_enclave(uintptr_t* host_regs, struct enclave_t* enclave)
 	return 0;
 }
 
+// 当退出enclave时，需要保存sPMP上下文至enclave数据结构中，并切换至host的sPMP状态
 //switch the spmp context from enclave to host before exiting enclave world
 void switch_spmp_context_e2h(struct enclave_t* enclave)
 {
@@ -435,13 +463,15 @@ int swap_from_enclave_to_host(uintptr_t* regs, struct enclave_t* enclave)
 	return 0;
 }
 
+// 
 uintptr_t create_enclave_m(struct enclave_sbi_param_t create_args)
 {
 	struct enclave_t* enclave;
 	unsigned int eid;
 	uintptr_t retval = 0;
-
+	// 创建enclave 需要先分配一个enclave数据结构
 	enclave = alloc_enclave();
+	// printm("[Penglai Monitor@%s] enclave_metadata ptr:0x%lx \r\n", __func__, (unsigned long)enclave);
 	if(!enclave)
 	{
 		printm("[Penglai Monitor@%s] enclave allocation is failed \r\n", __func__);
@@ -453,6 +483,7 @@ uintptr_t create_enclave_m(struct enclave_sbi_param_t create_args)
 	spin_lock(&enclave_metadata_lock);
 
 	eid = enclave->eid;
+	// printm("[enclave.c@%s] current enclave ID is %d.\n", __func__, eid);
 	enclave->paddr = create_args.paddr;
 	enclave->size = create_args.size;
 	enclave->entry_point = create_args.entry_point;
@@ -466,6 +497,8 @@ uintptr_t create_enclave_m(struct enclave_sbi_param_t create_args)
 	enclave->kbuffer = create_args.kbuffer;
 	enclave->kbuffer_size = create_args.kbuffer_size;
 	enclave->host_ptbr = csr_read(CSR_SATP);
+	enclave->shm_ptr = DEFAULT_SHM_PTR;
+
 	enclave->thread_context.encl_ptbr = (create_args.paddr >> (RISCV_PGSHIFT) | SATP_MODE_CHOICE);
 	enclave->root_page_table = (unsigned long*)create_args.paddr;
 	enclave->state = FRESH;
@@ -476,11 +509,16 @@ uintptr_t create_enclave_m(struct enclave_sbi_param_t create_args)
 	dump_pt(enclave->root_page_table, 1);
 #endif
 
-	printm("[Penglai@%s] paddr:0x%lx, size:0x%lx, entry:0x%lx\n"
-			"untrusted ptr:0x%lx host_ptbr:0x%lx, pt:0x%ln\n"
-			"thread_context.encl_ptbr:0x%lx\n cur_satp:0x%lx\n",
+	// printm("[Penglai Monitor@%s] enclave_mem->paddr:0x%lx \r\n", __func__, create_args.paddr);
+// 	printk("[Penglai Driver@%s] enclave_mem->paddr:0x%lx, size:0x%lx\n",
+			// __func__, (unsigned long)(enclave->enclave_mem->paddr),
+			// enclave->enclave_mem->size);
+
+	printm("[Penglai Monitor@%s]\npaddr:0x%lx, size:0x%lx, entry:0x%lx\n"
+			"untrusted ptr:0x%lx, host_ptbr:0x%lx, pt_root:0x%lx\n"
+			"thread_context.encl_ptbr:0x%lx, cur_satp:0x%lx\n",
 			__func__, enclave->paddr, enclave->size, enclave->entry_point,
-			enclave->untrusted_ptr, enclave->host_ptbr, enclave->root_page_table,
+			enclave->untrusted_ptr, enclave->host_ptbr, (long unsigned int)enclave->root_page_table,
 			enclave->thread_context.encl_ptbr, csr_read(CSR_SATP));
 
 	// Calculate the enclave's measurement
@@ -526,6 +564,7 @@ error_out:
 
 uintptr_t run_enclave(uintptr_t* regs, unsigned int eid)
 {
+	// printm("[enclave.c] %s invoked!\n", __func__);
 	struct enclave_t* enclave;
 	uintptr_t retval = 0;
 
@@ -557,7 +596,8 @@ uintptr_t run_enclave(uintptr_t* regs, unsigned int eid)
 		retval = -1UL;
 		goto run_enclave_out;
 	}
-
+	dump_spmps();
+	// dump_pt();
 	//swap_prev_mepc(&(enclave->thread_context), regs[32]);
 	regs[32] = (uintptr_t)(enclave->entry_point); //In OpenSBI, we use regs to change mepc
 
@@ -708,6 +748,7 @@ resume_from_stop_out:
 
 uintptr_t resume_enclave(uintptr_t* regs, unsigned int eid)
 {
+	// printm("[enclave.c] %s invoked!\n", __func__);
 	uintptr_t retval = 0;
 	struct enclave_t* enclave = get_enclave(eid);
 	if(!enclave)
@@ -806,7 +847,7 @@ uintptr_t exit_enclave(uintptr_t* regs, unsigned long retval)
 		printm_err("[Penglai Monitor@%s] cpu is not in enclave world now\r\n", __func__);
 		return -1;
 	}
-	printm_err("[Penglai Monitor@%s] retval of enclave is %lx\r\n", __func__, retval);
+	printm_err("[Penglai Monitor@%s] retval of enclave is 0x%lx\r\n", __func__, retval);
 
 	enclave = get_enclave(eid);
 
@@ -836,6 +877,7 @@ uintptr_t exit_enclave(uintptr_t* regs, unsigned long retval)
 
 uintptr_t enclave_sys_write(uintptr_t* regs)
 {
+	// printm("[enclave.c] %s invoked!", __func__);
 	uintptr_t ret = 0;
 	int eid = get_enclave_id();
 	struct enclave_t* enclave = NULL;
@@ -864,6 +906,7 @@ uintptr_t enclave_sys_write(uintptr_t* regs)
 	ret = ENCLAVE_OCALL;
 out:
 	spin_unlock(&enclave_metadata_lock);
+	// printm("[enclave.c] %s invoked complete!", __func__);
 	return ret;
 }
 
@@ -932,6 +975,7 @@ out:
 
 uintptr_t enclave_user_defined_ocall(uintptr_t* regs, uintptr_t ocall_buf_size)
 {
+	printm("[Penglai Monitor] %s invoked\r\n",__func__);
 	uintptr_t ret = 0;
 	int eid = get_enclave_id();
 	struct enclave_t* enclave = NULL;
@@ -1029,6 +1073,8 @@ timer_irq_out:
 
 uintptr_t resume_from_ocall(uintptr_t* regs, unsigned int eid)
 {
+	printm("[enclave.c] %s invoked!\n", __func__);
+
 	uintptr_t retval = 0;
 	uintptr_t ocall_func_id = regs[12];
 	struct enclave_t* enclave = NULL;

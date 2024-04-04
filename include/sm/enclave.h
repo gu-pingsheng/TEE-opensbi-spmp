@@ -18,6 +18,9 @@
 // define the time slice for an enclave
 #define ENCLAVE_TIME_CREDITS 100000
 
+// 共享内存的默认虚拟地址
+#define DEFAULT_SHM_PTR  0x1000080000
+
 struct link_mem_t
 {
   unsigned long mem_size;
@@ -80,6 +83,8 @@ struct enclave_t
   // hash of enclave developer's public key
   unsigned char signer[HASH_SIZE];
   struct spmp_config_t enclave_spmp_context[NSPMP];
+  unsigned long used_shm[NSPMP];
+  unsigned long shm_ptr;
   
   //enclave thread context
   //TODO: support multiple threads
@@ -91,6 +96,8 @@ struct cpu_state_t
   int in_enclave;
   int eid;
 };
+
+int get_enclave_id();
 
 uintptr_t create_enclave_m(struct enclave_sbi_param_t create_args);
 uintptr_t run_enclave(uintptr_t* regs, unsigned int eid);

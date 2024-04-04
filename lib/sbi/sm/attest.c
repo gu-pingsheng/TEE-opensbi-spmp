@@ -8,6 +8,7 @@
 static int hash_enclave_mem(SM3_STATE *hash_ctx, pte_t* ptes, int level,
         uintptr_t va, int hash_va)
 {
+    // 计算每页有多少个页表项
     uintptr_t pte_per_page = RISCV_PGSIZE/sizeof(pte_t);
     pte_t *pte;
     uintptr_t i = 0;
@@ -34,6 +35,7 @@ static int hash_enclave_mem(SM3_STATE *hash_ctx, pte_t* ptes, int level,
                 (i << ((level-1) * RISCV_PGLEVEL_BITS + RISCV_PGSHIFT));
         uintptr_t pa = (*pte >> PTE_PPN_SHIFT) << RISCV_PGSHIFT;
 
+        // 对可执行的代码页求hash值
         //found leaf pte
         if((*pte & PTE_R) || (*pte & PTE_X))
         {
@@ -68,6 +70,7 @@ static int hash_enclave_mem(SM3_STATE *hash_ctx, pte_t* ptes, int level,
     return hash_curr_va;
 }
 
+// 对enclave 的entry_point, untrusted_prt, untrusted_size, kbuffer, kuffer_size, 及 enclave的内存求hash值
 void hash_enclave(struct enclave_t *enclave, void* hash, uintptr_t nonce_arg)
 {
     SM3_STATE hash_ctx;
@@ -109,6 +112,7 @@ void update_enclave_hash(char *output, void* hash, uintptr_t nonce_arg)
     sbi_memcpy(output, hash, HASH_SIZE);
 }
 
+// 初始化SM的私钥和公钥，
 // initailize Secure Monitor's private key and public key.
 void attest_init()
 {
@@ -125,6 +129,7 @@ void attest_init()
         printm("SM2_KeyGeneration failed with ret value: %d\n", i);
 }
 
+// 使用SM的私钥和签名参数对enclave的消息进行签名
 void sign_enclave(void* signature_arg, unsigned char *message, int len)
 {
     struct signature_t *signature = (struct signature_t*)signature_arg;
@@ -134,6 +139,7 @@ void sign_enclave(void* signature_arg, unsigned char *message, int len)
         (unsigned char *)(signature->s));
 }
 
+// 使用SM的公钥和签名参数对enclave的消息进行验签
 int verify_enclave(void* signature_arg, unsigned char *message, int len)
 {
     int ret = 0;

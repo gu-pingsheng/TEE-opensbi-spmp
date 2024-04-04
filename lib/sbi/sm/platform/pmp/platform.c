@@ -14,6 +14,8 @@ static unsigned long form_pmp_size(unsigned long pmp_size) {
   return (pmp_size + 1);
 }
 
+
+// 配置PMP0，PMP N-1和sPMP N-1寄存器
 int platform_init()
 {
   struct pmp_config_t pmp_config;
@@ -25,13 +27,16 @@ int platform_init()
   //clear_pmp(1);
   clear_pmp_and_sync(1);
 
+  // 配置PMP0 寄存器隔离SM
   //config the PMP 0 to protect security monitor
   pmp_config.paddr = (uintptr_t)SM_BASE;
   pmp_config.size = form_pmp_size((unsigned long)SM_SIZE);
+  printm("[Penglai Monitor@%s] SM_SIZE:%lx B\n", __func__, (unsigned long)SM_SIZE);
   pmp_config.mode = PMP_A_NAPOT;
   pmp_config.perm = PMP_NO_PERM;
   set_pmp_and_sync(0, pmp_config);
 
+  // 配置PMP N-1 寄存器允许内核访问除前N - 1个PMP隔离的内存区域
   //config the last PMP to allow kernel to access memory
   pmp_config.paddr = 0;
   pmp_config.size = -1UL;
@@ -40,7 +45,8 @@ int platform_init()
   //set_pmp(NPMP-1, pmp_config);
   set_pmp_and_sync(NPMP-1, pmp_config);
 
-//config the last sPMP to allow user to access memory (SRWX=1000)
+  // 配置sPMP N-1 寄存器允许 U-mode Enclave 可以访问除 sPMP 隔离的其余内存区域
+  //config the last sPMP to allow user to access memory (SRWX=1000)
   struct spmp_config_t spmp_config;
   spmp_config.paddr = 0;
   spmp_config.size = -1UL;
