@@ -40,7 +40,7 @@ static pte_t* walk_enclave_pt(struct enclave_t* enclave, virtual_addr_t vaddr, b
 	{
 		int pt_index = get_pt_index(vaddr, i);
 		pte_t pt_entry = pgdir[pt_index];
-		printm("[page_map.c@%s] before: pt_level = %d, pgdir = 0x%lx, pt_entry = 0x%lx\n", __func__, i, (unsigned long int)pgdir, (unsigned long int)pt_entry);
+		// printm("[page_map.c@%s] before: pt_level = %d, pgdir = 0x%lx, pt_entry = 0x%lx\n", __func__, i, (unsigned long int)pgdir, (unsigned long int)pt_entry);
 		if(unlikely(!(pt_entry & PTE_V)))
 		{
 			if(create)
@@ -55,7 +55,7 @@ static pte_t* walk_enclave_pt(struct enclave_t* enclave, virtual_addr_t vaddr, b
 			else
 				printm("[SM@%s] Missing page table entry error!!!\n", __func__);
 		}
-		printm("[page_map.c@%s] after: pt_level = %d, pgdir = 0x%lx, pt_entry = 0x%lx\n", __func__, i, (unsigned long int)pgdir, (unsigned long int)pt_entry);
+		// printm("[page_map.c@%s] after: pt_level = %d, pgdir = 0x%lx, pt_entry = 0x%lx\n", __func__, i, (unsigned long int)pgdir, (unsigned long int)pt_entry);
 		// 获取下一级页目录的物理地址
 		pgdir = (pte_t*)pte2pa(pt_entry);
 		// printm("[page_map.c@%s] pt_entry = 0x%lx\n", (unsigned long int)pt_entry);
@@ -64,10 +64,10 @@ static pte_t* walk_enclave_pt(struct enclave_t* enclave, virtual_addr_t vaddr, b
 	return &pgdir[get_pt_index(vaddr, RISCV_PT_LEVEL - 1)];
 }
 
-virtual_addr_t map_va2pa(struct enclave_t* enclave, virtual_addr_t vaddr, physical_addr_t paddr, unsigned long perm)
+virtual_addr_t _map_va2pa(struct enclave_t* enclave, virtual_addr_t vaddr, physical_addr_t paddr, unsigned long perm)
 {
-	printm("[SM@%s] enclave -> root_page_table:0x%lx\n", __func__, (long unsigned int)enclave->root_page_table);
-	printm("[SM@%s] enclave -> free_mem:0x%lx\n", __func__, enclave->free_mem);
+	// printm("[SM@%s] enclave -> root_page_table:0x%lx\n", __func__, (long unsigned int)enclave->root_page_table);
+	// printm("[SM@%s] enclave -> free_mem:0x%lx\n", __func__, enclave->free_mem);
 
 	pte_t* pte = walk_enclave_pt(enclave, vaddr, true);
 	if (pte == NULL)
@@ -79,16 +79,16 @@ virtual_addr_t map_va2pa(struct enclave_t* enclave, virtual_addr_t vaddr, physic
 	// printm("[page_map@%s] pte = 0x%lx, ")
 	uintptr_t ppn = (uintptr_t)(paddr >> RISCV_PGSHIFT);
 	*pte = pte_create(ppn, perm);
-	printm("[page_map.c@%s] pt_enter = 0x%lx\n", __func__, (unsigned long int)*pte);
+	// printm("[page_map.c@%s] pt_enter = 0x%lx\n", __func__, (unsigned long int)*pte);
 	return vaddr;
 }
 
-int map(struct enclave_t* enclave, virtual_addr_t vaddr, physical_addr_t paddr, unsigned long size, unsigned long perm)
+int map_pa2va(struct enclave_t* enclave, virtual_addr_t vaddr, physical_addr_t paddr, unsigned long size, unsigned long perm)
 {
 	virtual_addr_t addr = vaddr;
 
 	for (; addr < vaddr + size; addr += RISCV_PGSIZE) {
-		map_va2pa(enclave, addr, paddr, perm);
+		_map_va2pa(enclave, addr, paddr, perm);
 		paddr += RISCV_PGSIZE;
 	}
 	

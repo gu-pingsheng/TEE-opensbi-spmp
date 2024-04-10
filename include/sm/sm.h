@@ -41,6 +41,8 @@ extern uintptr_t _fw_start[], _fw_end[];
 #define SBI_MAP_SHM             78
 #define SBI_GET_SHM             77
 
+#define SBI_GET_TIME_VALUE      70
+
 //Error code of SBI_ALLOC_ENCLAVE_MEM
 #define ENCLAVE_NO_MEMORY       -2
 #define ENCLAVE_ERROR           -1
@@ -64,7 +66,7 @@ extern uintptr_t _fw_start[], _fw_end[];
 struct enclave_shm_t
 {
   bool used;
-  unsigned long key;
+  uint64_t key;
   // unsigned int nums_cur_enclave;
   unsigned int eids[NUM_EACH_SHM];
   bool eids_used[NUM_EACH_SHM]; 
@@ -107,6 +109,12 @@ uintptr_t sm_do_timer_irq(uintptr_t *regs, uintptr_t mcause, uintptr_t mepc);
 
 int check_in_enclave_world();
 
-virtual_addr_t sm_create_shm(unsigned long key, unsigned long req_size, unsigned long perm);
-virtual_addr_t sm_map_shm(unsigned long key);
+// virtual_addr_t sm_create_shm(unsigned long key, unsigned long req_size, unsigned long perm);
+// virtual_addr_t sm_map_shm(unsigned long key);
+
+int32_t sm_create_shm(virtual_addr_t key, unsigned long req_size);
+
+int32_t sm_map_shm(unsigned long vaddr, int32_t shmid);
+
+
 #endif /* _SM_H */

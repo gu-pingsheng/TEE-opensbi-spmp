@@ -11,6 +11,6 @@
 #define RISCV_PT_LEVEL 3
 // const u32 RISCV_PT_LEVEL = (VA_BITS - RISCV_PGSHIFT) / RISCV_PGLEVEL_BITS;
 
-int map(struct enclave_t* enclave, virtual_addr_t vaddr, physical_addr_t paddr, unsigned long size, unsigned long perm);
+int map_pa2va(struct enclave_t* enclave, virtual_addr_t vaddr, physical_addr_t paddr, unsigned long size, unsigned long perm);
 
 #endif
