@@ -498,6 +498,7 @@ uintptr_t create_enclave_m(struct enclave_sbi_param_t create_args)
 	enclave->kbuffer_size = create_args.kbuffer_size;
 	enclave->host_ptbr = csr_read(CSR_SATP);
 	enclave->shm_ptr = DEFAULT_SHM_PTR;
+	enclave->shm_ownership = 0;
 
 	enclave->thread_context.encl_ptbr = (create_args.paddr >> (RISCV_PGSHIFT) | SATP_MODE_CHOICE);
 	enclave->root_page_table = (unsigned long*)create_args.paddr;
@@ -514,12 +515,12 @@ uintptr_t create_enclave_m(struct enclave_sbi_param_t create_args)
 			// __func__, (unsigned long)(enclave->enclave_mem->paddr),
 			// enclave->enclave_mem->size);
 
-	printm("[Penglai Monitor@%s]\npaddr:0x%lx, size:0x%lx, entry:0x%lx\n"
-			"untrusted ptr:0x%lx, host_ptbr:0x%lx, pt_root:0x%lx\n"
-			"thread_context.encl_ptbr:0x%lx, cur_satp:0x%lx\n",
-			__func__, enclave->paddr, enclave->size, enclave->entry_point,
-			enclave->untrusted_ptr, enclave->host_ptbr, (long unsigned int)enclave->root_page_table,
-			enclave->thread_context.encl_ptbr, csr_read(CSR_SATP));
+	// printm("[Penglai Monitor@%s]\npaddr:0x%lx, size:0x%lx, entry:0x%lx\n"
+	// 		"untrusted ptr:0x%lx, host_ptbr:0x%lx, pt_root:0x%lx\n"
+	// 		"thread_context.encl_ptbr:0x%lx, cur_satp:0x%lx\n",
+	// 		__func__, enclave->paddr, enclave->size, enclave->entry_point,
+	// 		enclave->untrusted_ptr, enclave->host_ptbr, (long unsigned int)enclave->root_page_table,
+	// 		enclave->thread_context.encl_ptbr, csr_read(CSR_SATP));
 
 	// Calculate the enclave's measurement
 	hash_enclave(enclave, (void*)(enclave->hash), 0);

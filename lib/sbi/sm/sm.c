@@ -18,6 +18,7 @@
 static spinlock_t shm_idx_lock = SPIN_LOCK_INITIALIZER;
 static spinlock_t shm_eid_idx_lock = SPIN_LOCK_INITIALIZER;
 static spinlock_t spmp_idx_lock = SPIN_LOCK_INITIALIZER;
+static spinlock_t shm_ownership_lock = SPIN_LOCK_INITIALIZER;
 static unsigned long shm_idx = 0;
 static unsigned long shm_eid_idx = 0;
 static unsigned long spmp_idx = 0;
@@ -135,14 +136,14 @@ uintptr_t sm_alloc_enclave_mem(uintptr_t mm_alloc_arg)
 
 uintptr_t sm_create_enclave(uintptr_t enclave_sbi_param)
 {
-  printm("[sm.c@%s] cur_satp = 0x%lx.\n", __func__, csr_read(CSR_SATP));
+  // printm("[sm.c@%s] cur_satp = 0x%lx.\n", __func__, csr_read(CSR_SATP));
 
   struct enclave_sbi_param_t enclave_sbi_param_local;
   uintptr_t retval = 0;
   struct enclave_t* enclave;
   unsigned int eid;
 
-  printm("[Penglai Monitor] %s invoked\r\n",__func__);
+  // printm("[Penglai Monitor] %s invoked\r\n",__func__);
 
   retval = copy_from_host(&enclave_sbi_param_local,
       (struct enclave_sbi_param_t*)enclave_sbi_param,
@@ -359,7 +360,7 @@ uintptr_t sm_do_timer_irq(uintptr_t *regs, uintptr_t mcause, uintptr_t mepc)
   return ret;
 }
 
-int32_t sm_create_shm(uint64_t key, unsigned long req_size){
+int32_t sm_create_shm(uint64_t key, uint64_t req_size){
   printm("[sm.c@%s] ----------sm create shm start---------\n", __func__);
   unsigned long resp_size = 0;
   printm("[sm.c@%s] req mem size is %ld.\n", __func__, (long int)req_size);
@@ -390,22 +391,26 @@ int32_t sm_create_shm(uint64_t key, unsigned long req_size){
   
   unsigned long shmid = -1;
 
+  uint32_t enclave_type = key & ENCLAVE_TYPE_MASK;
+  uint64_t shm_key = (key & SHM_KEY_MASK) >> SHM_KEY_SHIFT;
+
   spin_lock(&shm_idx_lock);
   for (shm_idx = 0; shm_idx < NUM_SHM; shm_idx++){
     if (!enclave_shm[shm_idx].used){
       shmid = shm_idx;
       enclave_shm[shm_idx].used = 1;
-      enclave_shm[shm_idx].key = key;
+      enclave_shm[shm_idx].key = shm_key;
       enclave_shm[shm_idx].paddr = (unsigned long)paddr;
       enclave_shm[shm_idx].size = (unsigned long)resp_size;
       enclave_shm[shm_idx].perm = spmp_perm;
 
-      //新的共享区指向当前enclave
+      //shm的创建者attach到共享内存
       spin_lock(&shm_eid_idx_lock);
       for (shm_eid_idx = 0; shm_eid_idx < NUM_EACH_SHM; shm_eid_idx++){
-        if (!enclave_shm[shm_idx].eids_used[shm_eid_idx]){
-          enclave_shm[shm_idx].eids_used[shm_eid_idx] = 1;
-          enclave_shm[shm_idx].eids[shm_eid_idx] = eid;
+        if (!enclave_shm[shm_idx].eids[shm_eid_idx].used){
+          enclave_shm[shm_idx].eids[shm_eid_idx].used = 1;
+          enclave_shm[shm_idx].eids[shm_eid_idx].eid = eid;
+          enclave_shm[shm_idx].eids[shm_eid_idx].enclave_type = enclave_type;
           break;
         }
       }
@@ -427,6 +432,11 @@ int32_t sm_create_shm(uint64_t key, unsigned long req_size){
       //sbit默认就是0，其实可以不用再次置为0
       enclave->enclave_spmp_context->sbit = 0;
       enclave->used_shm[spmp_idx] = 1;
+
+      spin_lock(&shm_ownership_lock);
+      enclave->shm_ownership = 1;
+      spin_unlock(&shm_ownership_lock);
+
       set_spmp(spmp_idx, enclave->enclave_spmp_context[spmp_idx]);
       break;
     }
@@ -437,8 +447,8 @@ int32_t sm_create_shm(uint64_t key, unsigned long req_size){
 }
 
 
-
-int32_t sm_map_shm(virtual_addr_t vaddr, int32_t shmid){
+// 
+int32_t sm_map_shm(virtual_addr_t vaddr, uint32_t shmid){
   unsigned long paddr, shm_size;
   u8 spmp_perm = 0, pt_perm = 0;
 
@@ -448,9 +458,8 @@ int32_t sm_map_shm(virtual_addr_t vaddr, int32_t shmid){
     paddr = enclave_shm[shm_idx].paddr;
     shm_size = enclave_shm[shm_idx].size;
     spmp_perm = enclave_shm[shm_idx].perm;
-  }
-  else{
-    return -1; // share memory不存在
+  }else {
+    return -1; // -1 share memory不存在
   }
   spin_unlock(&shm_idx_lock);
 
@@ -460,9 +469,8 @@ int32_t sm_map_shm(virtual_addr_t vaddr, int32_t shmid){
   int eid = -1;
   eid = get_enclave_id();
   if (eid == -1){
-    // printm("[sm.c@%s] get_enclave_id failed! \n", __func__);
     printm("[sm.c@%s] get_enclave_id failed! \n", __func__);
-    return -2; //-1 is get_enclave_id failed
+    return -2; //-2 is get_enclave_id failed
   } 
   // else {
   //   printm("[sm.c@%s] get_enclave_id succeed! eid is %d.\n", __func__, eid);
@@ -487,24 +495,399 @@ int32_t sm_map_shm(virtual_addr_t vaddr, int32_t shmid){
     *pa = shm_va;
     return 0; // 0 映射成功
   }
-
-  return -2;  // -2 映射失败
+  return -3;  // -3 映射失败
 }
 
 // 根据key
 int32_t sm_get_shmid(uint64_t key){
+  // uint32_t enclave_type = key & ENCLAVE_TYPE_MASK;
+  uint64_t shm_key = (key & SHM_KEY_MASK) >> SHM_KEY_SHIFT;
+
   int32_t local_shmid = -1;
   spin_lock(&shm_idx_lock);
   for (shm_idx = 0; shm_idx < NUM_SHM; shm_idx++){
-    if (enclave_shm[shm_idx].used && enclave_shm[shm_idx].key == key){
+    if (enclave_shm[shm_idx].used && enclave_shm[shm_idx].key == shm_key){
       local_shmid = (int32_t) shm_idx;
+      spin_unlock(&shm_idx_lock);
       return local_shmid;
-      break;
     } 
   }
   spin_unlock(&shm_idx_lock);
   return local_shmid;
 }
+
+
+int32_t sm_attach_shm(uint32_t shmid, uint32_t enclave_type){
+  unsigned long paddr = 0, shm_size = 0;
+
+  int eid = -1;
+  eid = get_enclave_id();
+  if (eid == -1){
+    printm("[sm.c@%s] get_enclave_id failed! \n", __func__);
+    return -1;
+  }
+  // else {
+  //   printm("[sm.c@%s] get_enclave_id succeed! eid is %d .\n", __func__, eid);
+  // }
+
+  struct enclave_t* enclave;
+  enclave =  get_enclave(eid);
+
+
+  spin_lock(&shm_idx_lock);
+  shm_idx = shmid;
+  if (enclave_shm[shm_idx].used){
+    paddr = enclave_shm[shm_idx].paddr;
+    shm_size = enclave_shm[shm_idx].size;
+    spin_lock(&shm_eid_idx_lock);
+    for (shm_eid_idx = 0; shm_eid_idx < NUM_EACH_SHM; shm_eid_idx++){
+      if (!enclave_shm[shm_idx].eids[shm_eid_idx].used){
+        enclave_shm[shm_idx].eids[shm_eid_idx].used = 1;
+        enclave_shm[shm_idx].eids[shm_eid_idx].enclave_type = enclave_type;
+        enclave_shm[shm_idx].eids[shm_eid_idx].eid = eid;
+        spin_unlock(&shm_eid_idx_lock);
+        spin_unlock(&shm_idx_lock);
+
+        spin_lock(&spmp_idx_lock);
+        //使用当前enclave的一个sPMP寄存器用来保护当前物理地址
+        //从第二个sPMP开始遍历，创建共享区sPMP保护
+        for (spmp_idx = 2; spmp_idx < NSPMP; spmp_idx++){
+          if(!enclave->used_shm[spmp_idx] && enclave->enclave_spmp_context[spmp_idx].mode == SPMP_OFF){
+            enclave->enclave_spmp_context[spmp_idx].paddr = (uintptr_t)paddr;
+            enclave->enclave_spmp_context[spmp_idx].size = shm_size;
+            enclave->enclave_spmp_context[spmp_idx].perm = SPMP_NO_PERM;
+            enclave->enclave_spmp_context[spmp_idx].mode = SPMP_OFF;
+            //sbit默认就是0，其实可以不用再次置为0
+            enclave->enclave_spmp_context->sbit = 0;
+            enclave->used_shm[spmp_idx] = 1;
+
+            spin_lock(&shm_ownership_lock);
+            enclave->shm_ownership = 0;
+            spin_unlock(&shm_ownership_lock);
+            break;
+          }
+        }
+        spin_unlock(&spmp_idx_lock);
+        return 0;
+      }
+    }
+    printm("[SM@%s]error: shm eid has been fully used!\n", __func__);
+    spin_unlock(&shm_idx_lock);
+    return -1; // 共享内存关联的Enclave已满
+  }
+  printm("[SM@%s]shmid=%d is not exist.\n", __func__, shmid);
+  spin_unlock(&shm_idx_lock);
+  return -2; // 共享内存不存在
+}
+
+// 根据key中shmid和Enclave类型, 找到指定的Enclave ID
+int32_t sm_getshm_eid(uint32_t shmid, uint32_t enclave_type){
+  // uint32_t shm_key = key & SHM_KEY_MASK;
+  // uint32_t enclave_type = key & ENCLAVE_TYPE_MASK;
+  // printm("[SM@%s] enclave_type = %d.\n", __func__, enclave_type);
+
+  // int32_t shmid = sm_get_shmid(key);
+
+  unsigned int eid_next = -1;
+  spin_lock(&shm_idx_lock);
+  shm_idx = shmid;
+  if (enclave_shm[shm_idx].used){
+    spin_lock(&shm_eid_idx_lock);
+    for (shm_eid_idx = 0; shm_eid_idx < NUM_EACH_SHM; shm_eid_idx++){
+      if (enclave_shm[shm_idx].eids[shm_eid_idx].used && enclave_shm[shm_idx].eids[shm_eid_idx].enclave_type == enclave_type){
+        eid_next = enclave_shm[shm_idx].eids[shm_eid_idx].eid;
+        spin_unlock(&shm_eid_idx_lock);
+        spin_unlock(&shm_idx_lock);
+        printm("[SM@%s] enclave_type=%d, its eid = %d\n", __func__, enclave_type, eid_next);
+        return eid_next;
+      }
+    }
+    if (shm_eid_idx == NUM_EACH_SHM) {
+      printm("[SM@%s] enclave_type  %d  Enclave not exist.\n", __func__, enclave_type);
+      spin_unlock(&shm_eid_idx_lock);
+      spin_unlock(&shm_idx_lock);
+    }
+  }
+  return eid_next; // -1 被转移的Enclave不存在
+}
+
+int32_t sm_transfer_shm(uint32_t shmid, uint32_t eid_next){
+  printm("[SM@%s]------ start-----\n", __func__);
+  unsigned long paddr = 0, shm_size = 0;
+  u8 spmp_perm = 0;
+
+  spin_lock(&shm_idx_lock);
+  shm_idx = shmid;
+  if (enclave_shm[shm_idx].used){
+    paddr = enclave_shm[shm_idx].paddr;
+    shm_size = enclave_shm[shm_idx].size;
+    spmp_perm = enclave_shm[shm_idx].perm;
+  }
+  spin_unlock(&shm_idx_lock);
+
+  struct enclave_t* enclave01, *enclave02;
+  uint32_t eid = get_enclave_id();
+  enclave01 = get_enclave(eid);
+  enclave02 = get_enclave(eid_next);
+
+  spin_lock(&spmp_idx_lock);
+    // 关闭当前Enclave共享内存的sPMP权限
+  for (spmp_idx = 2; spmp_idx < NSPMP; spmp_idx++){
+    if(enclave01->enclave_spmp_context[spmp_idx].mode != SPMP_OFF && \
+      enclave01->used_shm[spmp_idx] && \
+      enclave01->enclave_spmp_context[spmp_idx].paddr == paddr && \
+      enclave01->enclave_spmp_context[spmp_idx].size == shm_size){
+
+      enclave01->enclave_spmp_context[spmp_idx].mode = SPMP_OFF;
+
+      spin_lock(&shm_ownership_lock);
+      enclave01->shm_ownership = 0;
+      spin_unlock(&shm_ownership_lock);
+
+      set_spmp(spmp_idx, enclave01->enclave_spmp_context[spmp_idx]);
+      printm("[SM@%s] eid = %d spmp close.\n", __func__, enclave01->eid);
+      break;
+    }
+  }
+  // spin_unlock(&spmp_idx_lock);
+  // dump_spmps();
+
+
+  // spin_lock(&spmp_idx_lock);
+  // 开启下一个Enclave的sPMP权限
+  // 如果下一个Enclave的sPMP寄存器已经与共享内存绑定，那么打开即可
+  for (spmp_idx = 2; spmp_idx < NSPMP; spmp_idx++){
+    if(enclave02->enclave_spmp_context[spmp_idx].mode == SPMP_OFF && \
+      enclave02->used_shm[spmp_idx] && \
+      enclave02->enclave_spmp_context[spmp_idx].paddr == paddr && \
+      enclave02->enclave_spmp_context[spmp_idx].size == shm_size) {
+
+      enclave02->enclave_spmp_context[spmp_idx].mode = SPMP_NAPOT;
+
+      spin_lock(&shm_ownership_lock);
+      enclave02->shm_ownership = 1;
+      spin_unlock(&shm_ownership_lock);
+
+      spin_unlock(&spmp_idx_lock);
+      printm("[SM@%s] eid = %d spmp open.\n", __func__, enclave02->eid);
+      return 0;
+    }
+  }
+
+  // 如果下一个Enclave的sPMP寄存器还未与共享内存绑定，需要建立共享内存的sPMP映射并开启
+  for (spmp_idx = 2; spmp_idx < NSPMP; spmp_idx++){
+    if(!enclave02->used_shm[spmp_idx] && enclave02->enclave_spmp_context[spmp_idx].mode == SPMP_OFF){
+      enclave02->enclave_spmp_context[spmp_idx].paddr = (uintptr_t)paddr;
+      enclave02->enclave_spmp_context[spmp_idx].size = shm_size;
+      enclave02->enclave_spmp_context[spmp_idx].perm = spmp_perm;
+      enclave02->enclave_spmp_context[spmp_idx].mode = SPMP_NAPOT;
+      //sbit默认就是0，其实可以不用再次置为0
+      enclave02->enclave_spmp_context->sbit = 0;
+      enclave02->used_shm[spmp_idx] = 1;
+
+      spin_lock(&shm_ownership_lock);
+      enclave02->shm_ownership = 1;
+      spin_unlock(&shm_ownership_lock);
+
+      spin_unlock(&spmp_idx_lock);
+      printm("[SM@%s]no matched. eid = %d spmp open.\n", __func__, enclave02->eid);
+
+      return 0;
+    }
+  }
+
+  // if (spmp_idx == NSPMP){
+  printm("[SM@%s] spmp has been fully used!", __func__);
+  spin_unlock(&spmp_idx_lock);
+  return -1; // -1 spmp has been fully used
+
+}
+
+
+uint32_t sm_get_shm(uint32_t shmid){
+  struct enclave_t* enclave;
+  unsigned int eid = get_enclave_id();
+  enclave = get_enclave(eid);
+  
+  spin_lock(&shm_ownership_lock);
+  if (enclave->shm_ownership == 1){
+      spin_unlock(&shm_ownership_lock);
+      return 1;
+  } else {
+    spin_unlock(&shm_ownership_lock);
+    return 0;
+  }
+}
+
+/*
+int32_t sm_transfer_shm(uint32_t shmid, uint32_t enclave_type){
+  unsigned int eid = -1, eid_next = -1;
+  unsigned long paddr, shm_size;
+  u8 spmp_perm = 0;
+
+  if (enclave_type != 0) {
+    spin_lock(&shm_idx_lock);
+    shm_idx = shmid;
+    if (enclave_shm[shm_idx].used){
+      paddr = enclave_shm[shm_idx].paddr;
+      shm_size = enclave_shm[shm_idx].size;
+      spmp_perm = enclave_shm[shm_idx].perm;
+      spin_lock(&shm_eid_idx_lock);
+      for (shm_eid_idx = 0; shm_eid_idx < NUM_EACH_SHM; shm_eid_idx++){
+        if (enclave_shm[shm_idx].eids->used && enclave_shm[shm_idx].eids->enclave_type == enclave_type){
+          eid_next = enclave_shm[shm_idx].eids->eid;
+          break;
+        }
+      }
+      if (shm_eid_idx == NUM_EACH_SHM) {
+        printm("[SM@%s] enclave_type  %d  Enclave not exist.\n", __func__, enclave_type);
+        spin_unlock(&shm_eid_idx_lock);
+        spin_unlock(&shm_idx_lock);
+        return -1; // -1 被转移的Enclave不存在
+      }
+      spin_unlock(&shm_eid_idx_lock);
+    }else {
+      printm("[SM@%s] shmid  %d  share memory not exist.\n", __func__, shmid);
+      spin_unlock(&shm_idx_lock);
+      return -2; // -2 share memory不存在
+    }
+    spin_unlock(&shm_idx_lock);
+
+    struct enclave_t* enclave01, *enclave02;
+    eid = get_enclave_id();
+    enclave01 = get_enclave(eid);
+    enclave02 = get_enclave(eid_next);
+
+    spin_lock(&spmp_idx_lock);
+    // 关闭当前Enclave共享内存的sPMP权限
+    for (spmp_idx = 2; spmp_idx < NSPMP; spmp_idx++){
+      if(enclave01->enclave_spmp_context[spmp_idx].mode != SPMP_OFF && \
+        enclave01->used_shm[spmp_idx] && \
+        enclave01->enclave_spmp_context[spmp_idx].paddr == paddr && \
+        enclave01->enclave_spmp_context[spmp_idx].size == shm_size){
+
+        enclave01->enclave_spmp_context[spmp_idx].mode = SPMP_OFF;
+
+        spin_lock(&shm_ownership_lock);
+        enclave02->shm_ownership = 0;
+        spin_unlock(&shm_ownership_lock);
+
+        // set_spmp(spmp_idx, enclave01->enclave_spmp_context[spmp_idx]);
+        break;
+      }
+    }
+    spin_unlock(&spmp_idx_lock);
+    dump_spmps();
+
+
+    spin_lock(&spmp_idx_lock);
+    // 开启下一个Enclave的sPMP权限
+    // 如果下一个Enclave的sPMP寄存器已经与共享内存绑定，那么打开即可
+    for (spmp_idx = 2; spmp_idx < NSPMP; spmp_idx++){
+      if(enclave02->enclave_spmp_context[spmp_idx].mode != SPMP_OFF && \
+        enclave02->used_shm[spmp_idx] && \
+        enclave02->enclave_spmp_context[spmp_idx].paddr == paddr && \
+        enclave02->enclave_spmp_context[spmp_idx].size == shm_size) {
+
+        enclave02->enclave_spmp_context[spmp_idx].mode = SPMP_NAPOT;
+
+        spin_lock(&shm_ownership_lock);
+        enclave02->shm_ownership = 1;
+        spin_unlock(&shm_ownership_lock);
+
+        spin_unlock(&spmp_idx_lock);
+        return 0;
+      }
+    }
+
+    // 如果下一个Enclave的sPMP寄存器还未与共享内存绑定，需要建立共享内存的sPMP映射并开启
+    for (spmp_idx = 2; spmp_idx < NSPMP; spmp_idx++){
+      if(enclave02->enclave_spmp_context[spmp_idx].mode == SPMP_OFF){
+        enclave02->enclave_spmp_context[spmp_idx].paddr = (uintptr_t)paddr;
+        enclave02->enclave_spmp_context[spmp_idx].size = shm_size;
+        enclave02->enclave_spmp_context[spmp_idx].perm = spmp_perm;
+        enclave02->enclave_spmp_context[spmp_idx].mode = SPMP_NAPOT;
+        //sbit默认就是0，其实可以不用再次置为0
+        enclave02->enclave_spmp_context->sbit = 0;
+        enclave02->used_shm[spmp_idx] = 1;
+
+        spin_lock(&shm_ownership_lock);
+        enclave02->shm_ownership = 1;
+        spin_unlock(&shm_ownership_lock);
+
+        spin_unlock(&spmp_idx_lock);
+        return 0;
+      }
+    }
+  }else{
+    struct enclave_t *enclave02;
+    // eid = get_enclave_id();
+    // enclave01 = get_enclave(eid);
+
+    spin_lock(&shm_idx_lock);
+    shm_idx = shmid;
+    if (enclave_shm[shm_idx].used){
+      paddr = enclave_shm[shm_idx].paddr;
+      shm_size = enclave_shm[shm_idx].size;
+
+      // spin_lock(&spmp_idx_lock);
+      // for (spmp_idx = 2; spmp_idx < NSPMP; spmp_idx++){
+      //   if(enclave01->enclave_spmp_context[spmp_idx].mode != SPMP_OFF && 
+      //     enclave01->used_shm[spmp_idx] && 
+      //     enclave01->enclave_spmp_context[spmp_idx].paddr == paddr && 
+      //     enclave01->enclave_spmp_context[spmp_idx].size == shm_size){
+
+      //     enclave01->enclave_spmp_context[spmp_idx].perm = SPMP_R;
+      //     set_spmp(spmp_idx, enclave01->enclave_spmp_context[spmp_idx]);
+      //     break;
+      //   }
+      // }
+      // spin_unlock(&spmp_idx_lock);
+      // dump_spmps();
+
+      spin_lock(&shm_eid_idx_lock);
+      for (shm_eid_idx = 0; shm_eid_idx < NUM_EACH_SHM; shm_eid_idx++){
+        if (enclave_shm[shm_idx].eids->used){
+          eid_next = enclave_shm[shm_idx].eids->eid;
+
+          enclave02 = get_enclave(eid_next);
+          spin_lock(&spmp_idx_lock);
+          for (spmp_idx = 2; spmp_idx < NSPMP; spmp_idx++){
+            if(enclave02->enclave_spmp_context[spmp_idx].mode != SPMP_OFF && \
+              enclave02->used_shm[spmp_idx] && \
+              enclave02->enclave_spmp_context[spmp_idx].paddr == paddr && \
+              enclave02->enclave_spmp_context[spmp_idx].size == shm_size) {
+
+              enclave02->enclave_spmp_context[spmp_idx].perm = SPMP_R;
+              break;
+            }
+          }
+          spin_unlock(&spmp_idx_lock);
+
+          if (spmp_idx == NSPMP) {
+            spin_lock(&spmp_idx_lock);
+            for (spmp_idx = 2; spmp_idx < NSPMP; spmp_idx++){
+              if(enclave02->enclave_spmp_context[spmp_idx].mode == SPMP_OFF){
+                enclave02->enclave_spmp_context[spmp_idx].paddr = (uintptr_t)paddr;
+                enclave02->enclave_spmp_context[spmp_idx].size = shm_size;
+                enclave02->enclave_spmp_context[spmp_idx].perm = SPMP_R;
+                enclave02->enclave_spmp_context[spmp_idx].mode = SPMP_NAPOT;
+                enclave02->enclave_spmp_context->sbit = 0;
+                enclave02->used_shm[spmp_idx] = 1;
+                break;
+              }
+            }
+            spin_unlock(&spmp_idx_lock);
+          }
+        }
+      }
+    }
+    spin_unlock(&shm_idx_lock);
+  }
+  return 0;
+}*/
+
+
 
 
 /*
@@ -751,6 +1134,7 @@ virtual_addr_t sm_map_shm(unsigned long key){
 }
 */
 
+/*
 int sm_transfer_shm(int key){
   int eid01 = -1, eid02 = -1;
   eid01 = get_enclave_id();
@@ -817,7 +1201,7 @@ int sm_transfer_shm(int key){
   // 授予当前enclave共享区的所有权
   
 }
-
+*/
 
 // virtual_addr_t sm_create_shm(unsigned long key, unsigned long req_size, unsigned long perm){
 //   //申请安全物理内存

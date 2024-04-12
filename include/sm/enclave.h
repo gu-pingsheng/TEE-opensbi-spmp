@@ -85,7 +85,8 @@ struct enclave_t
   struct spmp_config_t enclave_spmp_context[NSPMP];
   unsigned long used_shm[NSPMP];
   unsigned long shm_ptr;
-  
+  bool shm_ownership;
+
   //enclave thread context
   //TODO: support multiple threads
   struct thread_state_t thread_context;

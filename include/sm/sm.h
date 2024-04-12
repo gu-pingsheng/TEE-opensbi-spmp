@@ -37,9 +37,13 @@ extern uintptr_t _fw_start[], _fw_end[];
 #define SBI_ENCLAVE_OCALL        98
 #define SBI_GET_KEY             88
 
-#define SBI_CREATE_SHM          79
-#define SBI_MAP_SHM             78
-#define SBI_GET_SHM             77
+#define SBI_CREATE_SHM          79  //创建共享内存，既要绑定sPMP并开启sPMP权限，又要attach到共享内存
+#define SBI_MAP_SHM             78  //建立共享内存的虚拟地址和物理地址映射
+#define SBI_GET_SHM             77  //
+#define SBI_GET_SHMID           76
+#define SBI_TRANSFER_SHM        75
+#define SBI_GETSHM_EID          74
+#define SBI_ATTACH_SHM          73
 
 #define SBI_GET_TIME_VALUE      70
 
@@ -63,13 +67,29 @@ extern uintptr_t _fw_start[], _fw_end[];
 #define NUM_SHM 128   // 定义共享内存的数量
 #define NUM_EACH_SHM 128 //定义每个共享区可被多少的enclave共享
 // #define DEFAULT_SHM_PTR  0x1000080000
+
+// #define ENCLAVE_TYPE_SHIFT 54
+// #define SHM_KEY_MASK (~(0x3ffUL << ENCLAVE_TYPE_SHIFT))
+// #define ENCLAVE_TYPE_MASK (0x3ffUL << ENCLAVE_TYPE_SHIFT)
+#define SHM_KEY_SHIFT 10
+#define SHM_KEY_MASK (~(0x3ff))
+#define ENCLAVE_TYPE_MASK (0x3ff)
+
+typedef struct shm_enclave
+{
+  bool used;
+  unsigned int eid;
+  uint32_t enclave_type;
+}shm_enclave;
+
 struct enclave_shm_t
 {
   bool used;
   uint64_t key;
-  // unsigned int nums_cur_enclave;
-  unsigned int eids[NUM_EACH_SHM];
-  bool eids_used[NUM_EACH_SHM]; 
+
+  shm_enclave eids[NUM_EACH_SHM];
+  // unsigned int eids[NUM_EACH_SHM];
+  // bool eids_used[NUM_EACH_SHM]; 
   unsigned long paddr;
   unsigned long size;
   u8 perm; // 被共享者默认具有的静态最大权限
@@ -109,12 +129,20 @@ uintptr_t sm_do_timer_irq(uintptr_t *regs, uintptr_t mcause, uintptr_t mepc);
 
 int check_in_enclave_world();
 
-// virtual_addr_t sm_create_shm(unsigned long key, unsigned long req_size, unsigned long perm);
-// virtual_addr_t sm_map_shm(unsigned long key);
 
-int32_t sm_create_shm(virtual_addr_t key, unsigned long req_size);
 
-int32_t sm_map_shm(unsigned long vaddr, int32_t shmid);
+int32_t sm_create_shm(uint64_t key, uint64_t req_size);
 
+int32_t sm_map_shm(virtual_addr_t vaddr, uint32_t shmid);
+
+int32_t sm_get_shmid(uint64_t key);
+
+int32_t sm_attach_shm(uint32_t shmid, uint32_t enclave_type);
+
+uint32_t sm_get_shm(uint32_t shmid);
+
+int32_t sm_getshm_eid(uint32_t shmid, uint32_t enclave_type);
+
+int32_t sm_transfer_shm(uint32_t shmid, uint32_t eid_next);
 
 #endif /* _SM_H */

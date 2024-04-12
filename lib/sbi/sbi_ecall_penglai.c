@@ -89,6 +89,21 @@ static int sbi_ecall_penglai_enclave_handler(unsigned long extid, unsigned long 
 			// ret = sm_map_shm(regs->a0);
 			ret = sm_map_shm(regs->a0, regs->a1);
 			break;
+		case SBI_GET_SHM:
+			ret = sm_get_shm(regs->a0);
+			break;
+		case SBI_GET_SHMID:
+			ret = sm_get_shmid(regs->a0);
+			break;
+		case SBI_TRANSFER_SHM:
+			ret = sm_transfer_shm(regs->a0, regs->a1);
+			break;
+		case SBI_GETSHM_EID:
+			ret = sm_getshm_eid(regs->a0, regs->a1);
+			break;		
+		case SBI_ATTACH_SHM:
+			ret = sm_attach_shm(regs->a0, regs->a1);
+			break;
 		case SBI_GET_TIME_VALUE:
 			ret = sbi_timer_value();
 			break;
