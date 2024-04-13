@@ -143,6 +143,7 @@ uint32_t sm_get_shm(uint32_t shmid);
 
 int32_t sm_getshm_eid(uint32_t shmid, uint32_t enclave_type);
 
-int32_t sm_transfer_shm(uint32_t shmid, uint32_t eid_next);
+int32_t sm_transfer_shm(uint32_t shmid, uint32_t eid_next, u8 perm);
+
 
 #endif /* _SM_H */

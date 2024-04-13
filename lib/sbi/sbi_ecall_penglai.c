@@ -96,7 +96,7 @@ static int sbi_ecall_penglai_enclave_handler(unsigned long extid, unsigned long 
 			ret = sm_get_shmid(regs->a0);
 			break;
 		case SBI_TRANSFER_SHM:
-			ret = sm_transfer_shm(regs->a0, regs->a1);
+			ret = sm_transfer_shm(regs->a0, regs->a1, regs->a2);
 			break;
 		case SBI_GETSHM_EID:
 			ret = sm_getshm_eid(regs->a0, regs->a1);
