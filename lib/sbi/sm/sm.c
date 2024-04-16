@@ -438,6 +438,7 @@ int32_t sm_create_shm(uint64_t key, uint64_t req_size){
       spin_unlock(&shm_ownership_lock);
 
       set_spmp(spmp_idx, enclave->enclave_spmp_context[spmp_idx]);
+      // dump_spmps();
       break;
     }
   }
@@ -459,6 +460,7 @@ int32_t sm_map_shm(virtual_addr_t vaddr, uint32_t shmid){
     shm_size = enclave_shm[shm_idx].size;
     spmp_perm = enclave_shm[shm_idx].perm;
   }else {
+    printm("[SM@%s] share memory not exist!\n", __func__);
     return -1; // -1 share memory不存在
   }
   spin_unlock(&shm_idx_lock);
@@ -567,6 +569,7 @@ int32_t sm_attach_shm(uint32_t shmid, uint32_t enclave_type){
             enclave->shm_ownership = 0;
             spin_unlock(&shm_ownership_lock);
             /*
+            dump_spmps();
             printm("[SM@%s]eid = %d, spmp[%lu] mode = %lu, used_shm = %lu, paddr=%lx, size=%lu.\n", __func__, \
             eid,\
             spmp_idx,\
@@ -614,7 +617,7 @@ int32_t sm_getshm_eid(uint32_t shmid, uint32_t enclave_type){
       }
     }
     if (shm_eid_idx == NUM_EACH_SHM) {
-      printm("[SM@%s] enclave_type  %d  Enclave not exist.\n", __func__, enclave_type);
+      // printm("[SM@%s] enclave_type  %d  Enclave not exist.\n", __func__, enclave_type);
       spin_unlock(&shm_eid_idx_lock);
       spin_unlock(&shm_idx_lock);
     }
@@ -738,10 +741,9 @@ uint32_t sm_get_shm(uint32_t shmid){
   if (enclave->shm_ownership == 1){
       spin_unlock(&shm_ownership_lock);
       return 1;
-  } else {
-    spin_unlock(&shm_ownership_lock);
-    return 0;
   }
+  spin_unlock(&shm_ownership_lock);
+  return 0;
 }
 
 /*
