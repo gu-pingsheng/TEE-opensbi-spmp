@@ -746,6 +746,22 @@ uint32_t sm_get_shm(uint32_t shmid){
   return 0;
 }
 
+
+int32_t sm_get_key_size(virtual_addr_t key, virtual_addr_t size){
+  struct enclave_t* enclave;
+  unsigned int eid = get_enclave_id();
+  enclave = get_enclave(eid);
+  // unsigned long key, rw_size;
+  // key = enclave->key;
+  // rw_size = enclave->rw_size;
+  // printm("[SM@%s]key = %lu, rw_size = %lu.\n", __func__ , key, rw_size);
+  unsigned long* var_key_pa = (unsigned long*)get_enclave_paddr_from_va(enclave->root_page_table, key);
+  *var_key_pa = enclave->key;
+  unsigned long* var_size_pa = (unsigned long*)get_enclave_paddr_from_va(enclave->root_page_table, size);
+  *var_size_pa = enclave->rw_size;
+  return 1;
+}
+
 /*
 int32_t sm_transfer_shm(uint32_t shmid, uint32_t enclave_type){
   unsigned int eid = -1, eid_next = -1;

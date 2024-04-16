@@ -81,6 +81,8 @@ struct enclave_sbi_param_t
   unsigned long *ecall_arg1;
   unsigned long *ecall_arg2;
   unsigned long *ecall_arg3;
+  unsigned long key;
+  unsigned long rw_size;
 };
 
 #endif /* _ENCLAVE_ARGS_H */

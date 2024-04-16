@@ -104,6 +104,9 @@ static int sbi_ecall_penglai_enclave_handler(unsigned long extid, unsigned long 
 		case SBI_ATTACH_SHM:
 			ret = sm_attach_shm(regs->a0, regs->a1);
 			break;
+		case SBI_GET_KEY_SIZE:
+			ret = sm_get_key_size(regs->a0, regs->a1);
+			break;
 		case SBI_GET_TIME_VALUE:
 			ret = sbi_timer_value();
 			break;

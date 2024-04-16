@@ -86,6 +86,8 @@ struct enclave_t
   unsigned long used_shm[NSPMP];
   unsigned long shm_ptr;
   bool shm_ownership;
+  unsigned long key;
+  unsigned long rw_size;
 
   //enclave thread context
   //TODO: support multiple threads

@@ -45,6 +45,8 @@ extern uintptr_t _fw_start[], _fw_end[];
 #define SBI_GETSHM_EID          74
 #define SBI_ATTACH_SHM          73
 
+#define SBI_GET_KEY_SIZE        71
+
 #define SBI_GET_TIME_VALUE      70
 
 //Error code of SBI_ALLOC_ENCLAVE_MEM
@@ -144,6 +146,8 @@ uint32_t sm_get_shm(uint32_t shmid);
 int32_t sm_getshm_eid(uint32_t shmid, uint32_t enclave_type);
 
 int32_t sm_transfer_shm(uint32_t shmid, uint32_t eid_next, u8 perm);
+
+int32_t sm_get_key_size(virtual_addr_t key, virtual_addr_t size);
 
 
 #endif /* _SM_H */

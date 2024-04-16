@@ -499,6 +499,8 @@ uintptr_t create_enclave_m(struct enclave_sbi_param_t create_args)
 	enclave->host_ptbr = csr_read(CSR_SATP);
 	enclave->shm_ptr = DEFAULT_SHM_PTR;
 	enclave->shm_ownership = 0;
+	enclave->key = create_args.key;
+	enclave->rw_size = create_args.rw_size;
 
 	enclave->thread_context.encl_ptbr = (create_args.paddr >> (RISCV_PGSHIFT) | SATP_MODE_CHOICE);
 	enclave->root_page_table = (unsigned long*)create_args.paddr;
