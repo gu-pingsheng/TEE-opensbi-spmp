@@ -49,6 +49,10 @@ extern uintptr_t _fw_start[], _fw_end[];
 
 #define SBI_GET_TIME_VALUE      70
 
+#define SBI_GET_CLOCK_START     69
+#define SBI_GET_CLOCK_END       68
+
+
 //Error code of SBI_ALLOC_ENCLAVE_MEM
 #define ENCLAVE_NO_MEMORY       -2
 #define ENCLAVE_ERROR           -1
@@ -149,5 +153,7 @@ int32_t sm_transfer_shm(uint32_t shmid, uint32_t eid_next, u8 perm);
 
 int32_t sm_get_key_size(virtual_addr_t key, virtual_addr_t size);
 
+uint64_t sm_clock_start();
+uint64_t sm_clock_end();
 
 #endif /* _SM_H */

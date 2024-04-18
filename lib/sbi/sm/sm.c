@@ -1,6 +1,7 @@
 //#include <sm/atomic.h>
 #include <sbi/riscv_atomic.h>
 #include <sbi/riscv_locks.h>
+#include <sbi/sbi_timer.h>
 #include <sm/sm.h>
 #include <sm/pmp.h>
 #include <sm/enclave.h>
@@ -19,6 +20,8 @@ static spinlock_t shm_idx_lock = SPIN_LOCK_INITIALIZER;
 static spinlock_t shm_eid_idx_lock = SPIN_LOCK_INITIALIZER;
 static spinlock_t spmp_idx_lock = SPIN_LOCK_INITIALIZER;
 static spinlock_t shm_ownership_lock = SPIN_LOCK_INITIALIZER;
+// static spinlock_t clock_lock = SPIN_LOCK_INITIALIZER;
+
 static unsigned long shm_idx = 0;
 static unsigned long shm_eid_idx = 0;
 static unsigned long spmp_idx = 0;
@@ -761,6 +764,103 @@ int32_t sm_get_key_size(virtual_addr_t key, virtual_addr_t size){
   *var_size_pa = enclave->rw_size;
   return 1;
 }
+
+
+/*
+uint64_t sm_clock_start(){
+  uint64_t time = csr_read(CSR_TIME);
+  printm("[SM@%s] clock_start = %lu.\n", __func__, time);
+  return time;
+}
+
+uint64_t sm_clock_end(){
+  uint64_t time = csr_read(CSR_TIME);
+  printm("[SM@%s] clock_end = %lu.\n", __func__, time);
+  return time;
+}
+*/
+
+
+uint64_t sm_clock_start(){
+  // csr_clear(CSR_MIE, MIP_MTIP);
+
+
+  // csr_clear(CSR_MSTATUS, MSTATUS_MIE);
+  // csr_clear(CSR_MSTATUS, MSTATUS_SIE);
+  // spin_lock(&clock_lock);
+	csr_clear(CSR_MIP, MIP_STIP);
+	csr_clear(CSR_MIP, MIP_MTIP);
+  csr_clear(CSR_MIE, MIP_STIP);
+	csr_clear(CSR_MIE, MIP_MTIP);
+
+  uint64_t time = csr_read(CSR_TIME);
+  printm("[SM@%s] clock_start = %lu.\n", __func__, time);
+  // return sbi_timer_value();
+  return time;
+}
+
+uint64_t sm_clock_end(){
+  // while (!spin_lock_check(&clock_lock));
+  // uint64_t clock_end = sbi_timer_value();
+
+  // csr_set(CSR_MSTATUS, MSTATUS_SIE);
+  // csr_set(CSR_MSTATUS, MSTATUS_MIE);
+
+  uint64_t time = csr_read(CSR_TIME);
+  printm("[SM@%s] clock_end = %lu.\n", __func__, time);
+  csr_set(CSR_MIE, MIP_STIP);
+  csr_set(CSR_MIE, MIP_MTIP);
+  // spin_unlock(&clock_lock);
+  // return clock_end;
+  return time;
+}
+
+
+/*
+uint64_t sm_clock_start(){
+  spin_lock(&clock_lock);
+  csr_clear(CSR_MIP, MIP_STIP);
+	csr_clear(CSR_MIP, MIP_MTIP);
+  csr_clear(CSR_MIE, MIP_STIP);
+	csr_clear(CSR_MIE, MIP_MTIP);
+  // uint64_t mie = csr_read(CSR_MIE);
+  // uint64_t mtip = mie & MIP_MTIP;
+  // csr_set(CSR_MIP, mtip);
+  // csr_clear(CSR_MSTATUS, MSTATUS_MIE);
+  // csr_clear(CSR_MIE, MIP_MTIP);
+  struct enclave_t* enclave;
+  unsigned int eid = get_enclave_id();
+  enclave = get_enclave(eid);
+  spin_lock(&enclave->enclave_lock);
+  // printm("[SM%s] eid = %u.\n", __func__, eid);
+  uint64_t clock_start = sbi_timer_value();
+  printm("[SM@%s] clock_start = %lu.\n", __func__, clock_start);
+  return clock_start;
+  // return sbi_timer_value();
+  // csr_swap(csr, mie);
+  // uint64_t mstatus = csr_read(CSR_MSTATUS);
+  // csr_clear(CSR_MSTATUS, MSTATUS_MIE);
+  // csr_swap(csr, mstatus);
+}
+
+uint64_t sm_clock_end(){
+  uint64_t clock_end = sbi_timer_value();
+  struct enclave_t* enclave;
+  unsigned int eid = get_enclave_id();
+  enclave = get_enclave(eid);
+  while (!spin_lock_check(&enclave->enclave_lock));
+  printm("[SM@%s] clock_end = %lu.\n", __func__, clock_end);
+  // printm("[SM%s] eid = %u.\n", __func__, eid);
+  spin_unlock(&enclave->enclave_lock);
+  // csr_set(CSR_MIE, MIP_MTIP);
+  // csr_set(CSR_MSTATUS, MSTATUS_MIE);
+  csr_set(CSR_MIE, MIP_STIP);
+  csr_set(CSR_MIE, MIP_MTIP);
+  spin_unlock(&clock_lock);
+  return clock_end;
+}
+*/
+
 
 /*
 int32_t sm_transfer_shm(uint32_t shmid, uint32_t enclave_type){

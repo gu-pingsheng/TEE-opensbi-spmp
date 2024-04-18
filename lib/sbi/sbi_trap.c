@@ -265,7 +265,7 @@ struct sbi_trap_regs *sbi_trap_handler(struct sbi_trap_regs *regs)
 			rc = -1;
 			break;
 		} else {// continue to sbi_ecall_handler
-			//sbi_printf("[Penglai] ecall from enclaves\n");
+			// sbi_printf("[Penglai] ecall from enclaves\n");
 		}
 	case CAUSE_SUPERVISOR_ECALL:
 	case CAUSE_MACHINE_ECALL:

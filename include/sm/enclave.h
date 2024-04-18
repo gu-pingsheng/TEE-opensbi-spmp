@@ -4,6 +4,7 @@
 #include <sbi/riscv_asm.h>
 #include <sm/vm.h>
 #include <sbi/riscv_encoding.h>
+#include <sbi/riscv_locks.h>
 #include <sm/enclave_args.h>
 #include <sbi/riscv_atomic.h>
 #include <sm/thread.h>
@@ -88,6 +89,7 @@ struct enclave_t
   bool shm_ownership;
   unsigned long key;
   unsigned long rw_size;
+  spinlock_t enclave_lock;
 
   //enclave thread context
   //TODO: support multiple threads

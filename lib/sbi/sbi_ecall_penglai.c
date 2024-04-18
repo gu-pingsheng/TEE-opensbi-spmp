@@ -110,6 +110,12 @@ static int sbi_ecall_penglai_enclave_handler(unsigned long extid, unsigned long 
 		case SBI_GET_TIME_VALUE:
 			ret = sbi_timer_value();
 			break;
+		case SBI_GET_CLOCK_START:
+			ret = sm_clock_start();
+			break;
+		case SBI_GET_CLOCK_END:
+			ret = sm_clock_end();
+			break;
 		case SBI_EXIT_ENCLAVE:
 			ret = sm_exit_enclave((uintptr_t *)regs, regs->a0);
 			break;
